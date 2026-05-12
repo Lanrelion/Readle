@@ -3,12 +3,12 @@ import Dexie from 'dexie';
 export const db = new Dexie('BookTrackDB');
 
 db.version(1).stores({
-  books: 'id, type, title, author, status, dateAdded',
-  quotes: 'id, bookId, dateSaved',
-  ebookProgress: 'id, bookId'
+  books: '++id, title, author, status, type, isbn',
+  quotes: '++id, bookId, text, dateSaved'
 });
 
-export const seedMockData = async () => {
+// Seed data helper
+export const seedInitialData = async () => {
   const count = await db.books.count();
   if (count > 0) return;
 
@@ -16,11 +16,11 @@ export const seedMockData = async () => {
     {
       id: crypto.randomUUID(),
       type: 'ebook',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      isbn: '978-0-441-13597-7',
+      title: 'The Great Gatsby',
+      author: 'F. Scott Fitzgerald',
+      isbn: '978-0743273565',
       status: 'reading',
-      cover: 'https://m.media-amazon.com/images/I/41D-A14y7GL._SY445_SX342_.jpg',
+      cover: 'https://m.media-amazon.com/images/I/41-6p-xVp0L._SY445_SX342_.jpg',
       progress: { type: 'percentage', value: 45 },
       dateAdded: new Date().toISOString(),
       dateCompleted: null,
