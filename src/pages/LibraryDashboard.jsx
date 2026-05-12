@@ -1,123 +1,176 @@
-import { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, seedInitialData } from '../services/db';
-import BookCard from '../components/BookCard';
-import { Search, Plus, Library, SlidersHorizontal, Layers, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Search, Library, BookPlus, Sun, Moon, SlidersHorizontal, Layers, ChevronDown, Quote } from 'lucide-react';
+import { db, seedMockData } from '../services/db';
+import BookCard from '../components/BookCard';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '../hooks/useTheme';
 
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.05 }
+    transition: {
+      staggerChildren: 0.05
+    }
   }
 };
 
-const CustomDropdown = ({ value, onChange, options, icon: Icon, label }) => {
+const CustomDropdown = ({ value, onChange, options, icon: Icon }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find(o => o.value === value);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/20 px-4 py-2 text-sm font-medium transition-all hover:bg-muted/30"
+        className={`flex h-10 w-full sm:w-[160px] items-center justify-between rounded-full border bg-muted/20 pl-10 pr-4 text-sm font-medium transition-all hover:bg-muted/30 focus:outline-none ${isOpen ? 'border-primary/50 ring-2 ring-primary/20' : 'border-border/60'}`}
       >
-        <Icon size={16} className="text-muted-foreground" />
-        <span>{selectedOption?.label}</span>
-        <ChevronDown size={14} className={`text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <Icon className="absolute left-3.5 text-muted-foreground" size={16} />
+        <span className="truncate text-foreground">{selected?.label}</span>
+        <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-48 rounded-2xl border border-border/60 bg-card p-2 shadow-xl backdrop-blur-md">
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-2xl border border-border/60 bg-card p-1.5 shadow-xl backdrop-blur-xl"
+          >
             {options.map((option) => (
               <button
                 key={option.value}
-                onClick={() => { onChange(option.value); setIsOpen(false); }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.value ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50'}`}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm transition-colors ${value === option.value ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/50'}`}
               >
                 {option.label}
               </button>
             ))}
-          </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
 export default function LibraryDashboard() {
+  const { theme, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
 
-  useEffect(() => { seedInitialData(); }, []);
+  // Seed mock data once on mount
+  useEffect(() => {
+    seedMockData();
+  }, []);
 
-  const books = useLiveQuery(async () => {
-    let collection = db.books;
-    let results = await collection.toArray();
+  // Reactive query to IndexedDB
+  const books = useLiveQuery(
+    async () => {
+      let collection = db.books.toCollection();
+      
+      // Filter by type
+      if (filterType !== 'all') {
+        collection = db.books.where('type').equals(filterType);
+      }
+      
+      let results = await collection.toArray();
+      
+      // Filter by status (in memory since we might have used the index for 'type')
+      if (filterStatus !== 'all') {
+        results = results.filter(b => b.status === filterStatus);
+      }
+      
+      // Search by title or author
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        results = results.filter(b => 
+          b.title.toLowerCase().includes(query) || 
+          b.author.toLowerCase().includes(query)
+        );
+      }
+      
+      // Sort reading first, then newest
+      return results.sort((a, b) => {
+        if (a.status === 'reading' && b.status !== 'reading') return -1;
+        if (b.status === 'reading' && a.status !== 'reading') return 1;
+        return new Date(b.dateAdded) - new Date(a.dateAdded);
+      });
+    },
+    [searchQuery, filterStatus, filterType],
+    [] // Default value before loading
+  );
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      results = results.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
-    }
-
-    if (filterStatus !== 'all') {
-      results = results.filter(b => b.status === filterStatus);
-    }
-
-    if (filterType !== 'all') {
-      results = results.filter(b => b.type === filterType);
-    }
-
-    return results;
-  }, [searchQuery, filterStatus, filterType]);
-
-  const stats = useLiveQuery(async () => {
-    const all = await db.books.toArray();
-    return {
-      total: all.length,
-      reading: all.filter(b => b.status === 'reading').length,
-      completed: all.filter(b => b.status === 'completed').length
-    };
-  }, []) || { total: 0, reading: 0, completed: 0 };
+  const stats = {
+    total: books?.length || 0,
+    reading: books?.filter(b => b.status === 'reading').length || 0,
+    completed: books?.filter(b => b.status === 'completed').length || 0
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
-      {/* Floating Action Button */}
-      <Link to="/add-book" className="fixed bottom-8 right-8 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 lg:bottom-12 lg:right-12">
-        <Plus size={32} />
-      </Link>
-
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 px-6 py-8 backdrop-blur-md lg:px-12">
-        <div className="container mx-auto flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                <Library size={24} />
-              </div>
-              <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">My Collection</span>
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md">
+        <div className="container mx-auto px-6 py-5 lg:px-12">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <img src="/readle-logo.png" alt="Readle Logo" className="h-11 w-11 object-contain mix-blend-multiply dark:mix-blend-screen dark:invert" />
+              <h1 className="text-[32px] font-serif font-bold tracking-tight text-foreground flex items-baseline">
+                Readle<span className="text-vermillion">.</span>
+              </h1>
             </div>
-            <h1 className="text-[32px] font-serif font-bold tracking-tight text-foreground lg:text-4xl">Readle Library</h1>
+            <div className="flex items-center gap-4">
+              <Link to="/quotes" className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground" title="Saved Quotes">
+                <Quote size={18} />
+              </Link>
+              <button 
+                onClick={toggleTheme}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              <Link to="/add" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3B4A6B] px-[20px] py-[14px] text-[14px] font-medium text-[#FAF8F4] shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]">
+                <BookPlus size={18} />
+                Add Book
+              </Link>
+            </div>
           </div>
 
-          <div className="flex gap-8 border-t border-border/30 pt-6 lg:border-none lg:pt-0">
+          {/* Stats Bar */}
+          <div className="mt-8 flex gap-8 text-sm">
             <button 
               onClick={() => setFilterStatus('all')}
               className={`flex flex-col gap-1 text-left transition-opacity hover:opacity-70 ${filterStatus === 'all' ? 'opacity-100' : 'opacity-60'}`}
             >
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${filterStatus === 'all' ? 'text-primary' : 'text-muted-foreground'}`}>Total Books</span>
-              <span className={`text-2xl font-semibold ${filterStatus === 'all' ? 'text-primary' : 'text-foreground'}`}>{stats.total}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Total Books</span>
+              <span className="text-2xl font-semibold text-foreground">{stats.total}</span>
             </button>
             <button 
               onClick={() => setFilterStatus('reading')}
               className={`flex flex-col gap-1 text-left transition-opacity hover:opacity-70 ${filterStatus === 'reading' ? 'opacity-100' : 'opacity-60'}`}
             >
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${filterStatus === 'reading' ? 'text-[#6F7D60] dark:text-[#A5BBA0]' : 'text-muted-foreground'}`}>Reading</span>
-              <span className={`text-2xl font-semibold ${filterStatus === 'reading' ? 'text-[#6F7D60] dark:text-[#A5BBA0]' : 'text-foreground'}`}>{stats.reading}</span>
+              <span className={`text-[11px] font-medium uppercase tracking-wider ${filterStatus === 'reading' ? 'text-[#4B5E41] dark:text-[#A5BBA0]' : 'text-muted-foreground'}`}>Reading</span>
+              <span className={`text-2xl font-semibold ${filterStatus === 'reading' ? 'text-[#4B5E41] dark:text-[#A5BBA0]' : 'text-foreground'}`}>{stats.reading}</span>
             </button>
             <button 
               onClick={() => setFilterStatus('completed')}
