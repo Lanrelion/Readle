@@ -1,86 +1,32 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Library, BookPlus, Sun, Moon, SlidersHorizontal, Layers, ChevronDown, Quote } from 'lucide-react';
+import { Books, MagnifyingGlass, BookOpen, Check } from '@phosphor-icons/react';
 import { db, seedMockData } from '../services/db';
 import BookCard from '../components/BookCard';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from '../hooks/useTheme';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
-};
-
-const CustomDropdown = ({ value, onChange, options, icon: Icon }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const selected = options.find(o => o.value === value);
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-10 w-full sm:w-[160px] items-center justify-between rounded-full border bg-muted/20 pl-10 pr-4 text-sm font-medium transition-all hover:bg-muted/30 focus:outline-none ${isOpen ? 'border-primary/50 ring-2 ring-primary/20' : 'border-border/60'}`}
-      >
-        <Icon className="absolute left-3.5 text-muted-foreground" size={16} />
-        <span className="truncate text-foreground">{selected?.label}</span>
-        <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: 5, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 5, scale: 0.98 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-2xl border border-border/60 bg-card p-1.5 shadow-xl backdrop-blur-xl"
-          >
-            {options.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm transition-colors ${value === option.value ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/50'}`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
+import Navigation from '../components/Navigation';
+import gsap from 'gsap';
 
 export default function LibraryDashboard() {
-  const { theme, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const dashboardRef = useRef(null);
 
   // Seed mock data once on mount
   useEffect(() => {
     seedMockData();
+  }, []);
+
+  // Entrance animation for dashboard elements
+  useEffect(() => {
+    if (!dashboardRef.current) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(dashboardRef.current, 
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }
+      );
+    });
+    return () => ctx.revert();
   }, []);
 
   // Reactive query to IndexedDB
@@ -126,131 +72,129 @@ export default function LibraryDashboard() {
     completed: books?.filter(b => b.status === 'completed').length || 0
   };
 
+  const statusFilters = [
+    { value: 'all', label: 'All Collection' },
+    { value: 'reading', label: 'Currently Reading' },
+    { value: 'wantToRead', label: 'Want to Read' },
+    { value: 'completed', label: 'Finished' },
+  ];
+
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto px-6 py-5 lg:px-12">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <img src="/readle-logo.png" alt="Readle Logo" className="h-11 w-11 object-contain mix-blend-multiply dark:mix-blend-screen dark:invert" />
-              <h1 className="text-[32px] font-serif font-bold tracking-tight text-foreground flex items-baseline">
-                Readle<span className="text-vermillion">.</span>
-              </h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link to="/quotes" className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground" title="Saved Quotes">
-                <Quote size={18} />
-              </Link>
-              <button 
-                onClick={toggleTheme}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-              <Link to="/add" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3B4A6B] px-[20px] py-[14px] text-[14px] font-medium text-[#FAF8F4] shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]">
-                <BookPlus size={18} />
-                Add Book
-              </Link>
-            </div>
-          </div>
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-indigo/20 lg:pl-64 pb-28 lg:pb-12">
+      {/* Shared Responsive Sidebar/Bottom-Bar Nav */}
+      <Navigation />
 
-          {/* Stats Bar */}
-          <div className="mt-8 flex gap-8 text-sm">
-            <button 
-              onClick={() => setFilterStatus('all')}
-              className={`flex flex-col gap-1 text-left transition-opacity hover:opacity-70 ${filterStatus === 'all' ? 'opacity-100' : 'opacity-60'}`}
-            >
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Total Books</span>
-              <span className="text-2xl font-semibold text-foreground">{stats.total}</span>
-            </button>
-            <button 
-              onClick={() => setFilterStatus('reading')}
-              className={`flex flex-col gap-1 text-left transition-opacity hover:opacity-70 ${filterStatus === 'reading' ? 'opacity-100' : 'opacity-60'}`}
-            >
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${filterStatus === 'reading' ? 'text-[#4B5E41] dark:text-[#A5BBA0]' : 'text-muted-foreground'}`}>Reading</span>
-              <span className={`text-2xl font-semibold ${filterStatus === 'reading' ? 'text-[#4B5E41] dark:text-[#A5BBA0]' : 'text-foreground'}`}>{stats.reading}</span>
-            </button>
-            <button 
-              onClick={() => setFilterStatus('completed')}
-              className={`flex flex-col gap-1 text-left transition-opacity hover:opacity-70 ${filterStatus === 'completed' ? 'opacity-100' : 'opacity-60'}`}
-            >
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${filterStatus === 'completed' ? 'text-[#3B4A6B] dark:text-[#A8B7CD]' : 'text-muted-foreground'}`}>Completed</span>
-              <span className={`text-2xl font-semibold ${filterStatus === 'completed' ? 'text-[#3B4A6B] dark:text-[#A8B7CD]' : 'text-foreground'}`}>{stats.completed}</span>
-            </button>
+      {/* Main Page Sandbox */}
+      <div ref={dashboardRef} className="container mx-auto px-6 py-8 lg:px-12 max-w-7xl">
+        
+        {/* Page Hero Header */}
+        <header className="flex flex-col gap-4 py-6 border-b border-foreground-tertiary/10 mb-8">
+          <div className="flex justify-between items-baseline">
+            <span className="text-xs font-accent uppercase tracking-widest text-foreground-tertiary">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </span>
           </div>
-        </div>
-      </header>
+          
+          <h1 className="text-5xl font-serif font-normal text-foreground leading-tight">
+            Your Quiet Library
+          </h1>
+          
+          <p className="text-foreground-secondary font-sans text-base max-w-md">
+            A visual, tactile collection of stories, thoughts, and reading journeys.
+          </p>
+        </header>
 
-      <main className="container mx-auto px-6 py-10 lg:px-12">
-        {/* Controls */}
-        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+        {/* Tactical Statistics Section */}
+        <section className="grid grid-cols-3 gap-6 p-6 bg-background-secondary rounded-none border border-foreground-tertiary/10 mb-10">
+          <div className="text-center space-y-1.5 border-r border-foreground-tertiary/10">
+            <p className="text-3xl font-serif font-normal text-foreground">{stats.total}</p>
+            <p className="text-xs font-accent text-foreground-tertiary uppercase tracking-wider">Volumes Collected</p>
+          </div>
+          <div className="text-center space-y-1.5 border-r border-foreground-tertiary/10">
+            <p className="text-3xl font-serif font-normal text-moss">{stats.reading}</p>
+            <p className="text-xs font-accent text-foreground-tertiary uppercase tracking-wider">Currently Reading</p>
+          </div>
+          <div className="text-center space-y-1.5">
+            <p className="text-3xl font-serif font-normal text-clay">{stats.completed}</p>
+            <p className="text-xs font-accent text-foreground-tertiary uppercase tracking-wider">Completed</p>
+          </div>
+        </section>
+
+        {/* Custom Search bar & Format Controls */}
+        <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          {/* Muted Translucent Search Bar */}
+          <div className="relative w-full max-w-md">
+            <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-tertiary" size={18} weight="thin" />
             <input 
               type="text" 
-              placeholder="Search by title or author..." 
+              placeholder="Search your quiet collection…" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-full border border-border/60 bg-muted/20 py-2.5 pl-11 pr-4 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background"
+              className="w-full rounded-none border border-foreground-tertiary/20 bg-background-secondary/50 backdrop-blur py-3 pl-12 pr-4 text-sm font-sans outline-none transition duration-200 placeholder:text-foreground-tertiary/60 focus:border-indigo focus:bg-background"
             />
           </div>
-          <div className="flex gap-3">
-            <CustomDropdown 
-              value={filterStatus}
-              onChange={setFilterStatus}
-              icon={SlidersHorizontal}
-              options={[
-                { value: 'all', label: 'All Status' },
-                { value: 'reading', label: 'Reading' },
-                { value: 'wantToRead', label: 'Want to Read' },
-                { value: 'completed', label: 'Completed' }
-              ]}
-            />
-            <CustomDropdown 
-              value={filterType}
-              onChange={setFilterType}
-              icon={Layers}
-              options={[
-                { value: 'all', label: 'All Types' },
-                { value: 'ebook', label: 'Ebooks' },
-                { value: 'physical', label: 'Physical Books' }
-              ]}
-            />
+
+          {/* Ebook vs Physical Selectors */}
+          <div className="flex gap-2">
+            {['all', 'ebook', 'physical'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-5 py-2 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 ${
+                  filterType === type 
+                    ? 'border-indigo bg-indigo text-background' 
+                    : 'border-foreground-tertiary/20 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
+                }`}
+              >
+                {type === 'all' ? 'All Formats' : type}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Grid */}
+        {/* Editorial Tab Status Filter */}
+        <div className="border-b border-foreground-tertiary/10 mb-8 overflow-x-auto scrollbar-none">
+          <div className="flex gap-8 whitespace-nowrap min-w-max pb-px">
+            {statusFilters.map((tab) => {
+              const isActive = filterStatus === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setFilterStatus(tab.value)}
+                  className={`text-base font-sans font-medium pb-3 transition-colors duration-300 relative rounded-none border-b-2 ${
+                    isActive 
+                      ? 'border-moss text-foreground font-semibold' 
+                      : 'border-transparent text-foreground-tertiary hover:text-foreground'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main Grid View */}
         {books === undefined ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-r-transparent"></div>
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-none border-2 border-indigo border-r-transparent"></div>
           </div>
         ) : books.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 text-center"
-          >
-            <Library size={48} className="mb-4 text-muted-foreground/30" />
-            <h3 className="text-lg font-medium text-foreground">No books found</h3>
-            <p className="mb-4 mt-1 text-sm text-muted-foreground">
-              Try adjusting your filters or add a new book to your library.
+          <div className="flex min-h-[350px] flex-col items-center justify-center rounded-none border border-dashed border-foreground-tertiary/30 bg-background-secondary/30 text-center p-8">
+            <Books size={48} weight="thin" className="mb-4 text-foreground-tertiary/40" />
+            <h3 className="text-xl font-serif text-foreground-secondary">Your shelf awaits its first story.</h3>
+            <p className="mb-6 mt-2 text-sm text-foreground-tertiary max-w-sm">
+              Browse your collection or add a new volume to begin your reading log.
             </p>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-          >
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5">
             {books.map(book => (
               <BookCard key={book.id} book={book} />
             ))}
-          </motion.div>
+          </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

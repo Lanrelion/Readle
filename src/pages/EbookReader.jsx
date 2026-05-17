@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Gear, X, Palette } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
 import { useTheme } from '../hooks/useTheme';
+import gsap from 'gsap';
 
 export default function EbookReader() {
   const { id } = useParams();
@@ -19,7 +20,7 @@ export default function EbookReader() {
   const [showControls, setShowControls] = useState(false);
   const [fontSize, setFontSize] = useState(100);
   const [pendingQuote, setPendingQuote] = useState(null);
-  const [quoteColor, setQuoteColor] = useState('#F7F3ED');
+  const [quoteColor, setQuoteColor] = useState('#F5F1E8');
   const { theme } = useTheme();
 
   const bookData = useLiveQuery(() => db.books.get(id), [id]);
@@ -30,11 +31,9 @@ export default function EbookReader() {
 
     const fileReader = new FileReader();
     fileReader.onload = (e) => {
-      // Prevent strict-mode race conditions
       if (bookRef.current) return; 
 
       const bookDataArrayBuffer = e.target.result;
-      
       const epub = ePub(bookDataArrayBuffer);
       bookRef.current = epub;
 
@@ -47,9 +46,7 @@ export default function EbookReader() {
       });
       renditionRef.current = rendition;
 
-      renditionRef.current = rendition;
-
-      // Update progress instantly using spine (chapter) mapping instead of heavy location generation
+      // Update progress using chapter spine index mapping
       const updateProgress = (loc) => {
         setLocation(loc);
         
@@ -57,13 +54,9 @@ export default function EbookReader() {
         let page = 0;
         let total = parseInt(bookData.metadata?.totalPages) || 0;
 
-        // Instant rough calculation based on current chapter
         const spineItem = epub.spine.get(loc.start.cfi);
         if (spineItem && epub.spine.length > 0) {
-          // Calculate percentage based on chapter progress
           percentage = Math.round((spineItem.index / epub.spine.length) * 100);
-          
-          // Estimate page if totalPages was manually provided
           if (total > 0) {
             page = Math.max(1, Math.round((percentage / 100) * total));
           }
@@ -72,8 +65,6 @@ export default function EbookReader() {
         setReadingProgress({ page, total, percentage: percentage || 0 });
 
         const updateData = {};
-        
-        // Don't revert completed status to reading
         if (bookData.status !== 'completed') {
           updateData.status = 'reading';
         }
@@ -81,7 +72,6 @@ export default function EbookReader() {
         if (percentage !== null) {
           updateData.progress = { 
             type: 'percentage', 
-            // If the book is completed, preserve its 100% progress value
             value: bookData.status === 'completed' ? (bookData.progress?.value || 100) : percentage, 
             cfi: loc.start.cfi 
           };
@@ -99,7 +89,7 @@ export default function EbookReader() {
       rendition.display(savedCfi).then(async () => {
         setIsReady(true);
         try {
-          // Load existing quotes and apply highlights
+          // Load quotes and apply highlights inside the reader
           const bookQuotes = await db.quotes.where('bookId').equals(id).toArray();
           bookQuotes.forEach(q => {
             if (q.cfi) {
@@ -113,7 +103,7 @@ export default function EbookReader() {
 
       rendition.on('relocated', updateProgress);
       
-      // Handle text selection for saving quotes (epub.js only binds to mouseup, so we fix mobile)
+      // Text selection for quote generation
       rendition.on('selected', (cfiRange, contents) => {
         epub.getRange(cfiRange).then(range => {
           if (range) {
@@ -125,7 +115,7 @@ export default function EbookReader() {
         }).catch(err => console.warn('Failed to get selection range', err));
       });
 
-      // Fix mobile selection by simulating mouseup on touchend
+      // Mobile touch selector simulator
       rendition.hooks.content.register((contents) => {
         const doc = contents.document;
         const win = contents.window;
@@ -142,20 +132,17 @@ export default function EbookReader() {
           }
         });
 
-        // Double-tap to select sentence
+        // Double-tap expands to sentence
         let lastTap = 0;
         doc.addEventListener('touchend', (e) => {
           const currentTime = new Date().getTime();
           const tapLength = currentTime - lastTap;
           if (tapLength < 500 && tapLength > 0) {
-            // Double tap detected
             const selection = win.getSelection();
             if (selection && !selection.isCollapsed) {
               try {
-                // Try to use browser's native sentence expansion
                 selection.modify("move", "backward", "sentence");
                 selection.modify("extend", "forward", "sentence");
-                
                 const event = new MouseEvent('mouseup', { view: win, bubbles: true, cancelable: true });
                 doc.dispatchEvent(event);
               } catch (err) {
@@ -179,14 +166,14 @@ export default function EbookReader() {
         });
       });
 
-      // Register themes for proper contrast and typography
+      // Custom quiet editorial themes injected into epub document iframe
       rendition.themes.register('light', {
-        body: { background: '#F7F3ED', color: '#1F1A17', padding: '0 20px', 'font-family': '"Noto Serif JP", serif' },
-        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#1F1A17 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
+        body: { background: '#F5F1E8', color: '#1D1B18', padding: '0 24px', 'font-family': '"Noto Serif JP", serif' },
+        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#1D1B18 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important', 'font-size': '17px !important' }
       });
       rendition.themes.register('dark', {
-        body: { background: '#1F1A17', color: '#F7F3ED', padding: '0 20px', 'font-family': '"Noto Serif JP", serif' },
-        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#F7F3ED !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
+        body: { background: '#1A1813', color: '#F5F1E8', padding: '0 24px', 'font-family': '"Noto Serif JP", serif' },
+        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#F5F1E8 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important', 'font-size': '17px !important' }
       });
       
       rendition.themes.select(theme);
@@ -194,9 +181,9 @@ export default function EbookReader() {
     };
     
     fileReader.readAsArrayBuffer(bookData.fileBlob);
-  }, [bookData?.fileBlob]); // Only depend on fileBlob reference
+  }, [bookData?.fileBlob]);
 
-  // Handle cleanup only on unmount
+  // Clean up ePub on unmount
   useEffect(() => {
     return () => {
       if (bookRef.current) {
@@ -206,7 +193,7 @@ export default function EbookReader() {
     };
   }, []);
 
-  // Handle font size and theme changes without destroying the book
+  // Update themes and zoom sizes reactively without tearing down the renderer
   useEffect(() => {
     if (renditionRef.current) {
       renditionRef.current.themes.fontSize(`${fontSize}%`);
@@ -217,91 +204,99 @@ export default function EbookReader() {
   const next = () => renditionRef.current?.next();
   const prev = () => renditionRef.current?.prev();
 
-  const handleZoomIn = () => {
-    const newSize = Math.min(200, fontSize + 10);
-    setFontSize(newSize);
-    renditionRef.current?.themes.fontSize(`${newSize}%`);
-  };
+  const handleZoomIn = () => setFontSize(prev => Math.min(200, prev + 10));
+  const handleZoomOut = () => setFontSize(prev => Math.max(50, prev - 10));
 
-  const handleZoomOut = () => {
-    const newSize = Math.max(50, fontSize - 10);
-    setFontSize(newSize);
-    renditionRef.current?.themes.fontSize(`${newSize}%`);
-  };
-
-  if (bookData === undefined) return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-r-transparent"></div>
-    </div>
-  );
+  if (bookData === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-none border-2 border-indigo border-r-transparent"></div>
+      </div>
+    );
+  }
   
-  if (!bookData || !bookData.fileBlob) return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background">
-      <p className="text-muted-foreground font-medium">Book file not found or corrupted.</p>
-      <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center rounded-full bg-[#3B4A6B] px-[20px] py-[14px] text-[14px] font-medium text-[#FAF8F4] shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]">Go Back</button>
-    </div>
-  );
+  if (!bookData || !bookData.fileBlob) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background">
+        <p className="text-foreground-secondary font-serif font-normal">Book file not found or corrupted.</p>
+        <button onClick={() => navigate(-1)} className="px-6 py-2.5 bg-indigo text-background text-sm font-medium rounded-none hover:bg-clay transition duration-300">Go Back</button>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background text-foreground font-sans">
-      <div className={`absolute left-0 right-0 top-0 z-50 flex items-center justify-between border-b border-border/60 bg-background/80 px-6 py-4 backdrop-blur-md transition-transform duration-300 ${isReady ? 'translate-y-0' : '-translate-y-full'}`}>
+    <div className="relative h-screen w-full overflow-hidden bg-background text-foreground font-sans z-50">
+      
+      {/* Top Header Panel (rounded-none, border-b border-foreground-tertiary/20) */}
+      <header className={`fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex justify-between items-center px-6 z-50 transition-transform duration-300 ${isReady ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="rounded-full p-2.5 hover:bg-muted/50 transition-colors">
-            <ArrowLeft size={20} />
+          <button 
+            onClick={() => navigate(-1)} 
+            className="rounded-none p-2 hover:bg-background-secondary text-foreground-secondary hover:text-foreground transition duration-200"
+            aria-label="Exit reader"
+          >
+            <X size={20} weight="thin" />
           </button>
-          <h1 className="line-clamp-1 font-serif text-base font-semibold">{bookData.title}</h1>
+          <h2 className="line-clamp-1 font-serif text-sm font-normal text-foreground">
+            {bookData.title}
+          </h2>
         </div>
         
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowControls(!showControls)} className={`rounded-full p-2.5 transition-colors ${showControls ? 'bg-muted text-foreground' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}>
-            <Settings size={20} />
+          <button 
+            onClick={() => setShowControls(!showControls)} 
+            className={`rounded-none p-2 transition duration-200 ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
+            aria-label="Settings"
+          >
+            <Gear size={20} weight="thin" />
           </button>
         </div>
-      </div>
+      </header>
 
+      {/* Floating Settings Tooltip Menu */}
       {showControls && (
-        <div className="absolute right-6 top-20 z-50 rounded-3xl border border-border/60 bg-card p-6 shadow-sm w-72">
-          <h3 className="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wider">Reading Settings</h3>
+        <div className="absolute right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-72">
+          <h3 className="mb-4 text-xs font-accent text-foreground-tertiary uppercase tracking-widest border-b border-foreground-tertiary/10 pb-2">Reading Preferences</h3>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Font Size</span>
-            <div className="flex items-center rounded-xl border border-border/60 bg-muted/20 overflow-hidden">
-              <button onClick={handleZoomOut} className="px-4 py-2 hover:bg-muted/50 text-foreground transition-colors">-</button>
-              <span className="text-sm font-medium text-foreground w-12 text-center border-x border-border/30">{fontSize}%</span>
-              <button onClick={handleZoomIn} className="px-4 py-2 hover:bg-muted/50 text-foreground transition-colors">+</button>
+            <span className="text-sm font-sans font-medium text-foreground">Font Zoom</span>
+            <div className="flex items-center rounded-none border border-foreground-tertiary/30 bg-background overflow-hidden">
+              <button onClick={handleZoomOut} className="px-3 py-1 hover:bg-background-secondary text-foreground transition-colors">-</button>
+              <span className="text-xs font-medium text-foreground w-12 text-center border-x border-foreground-tertiary/20">{fontSize}%</span>
+              <button onClick={handleZoomIn} className="px-3 py-1 hover:bg-background-secondary text-foreground transition-colors">+</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Pending Quote Modal */}
+      {/* Save Selection Dialogue Box */}
       {pendingQuote && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
-          <div className="rounded-[20px] border border-border/60 bg-card p-5 shadow-2xl backdrop-blur-md">
-            <h3 className="mb-3 text-sm font-medium">Save Selected Text</h3>
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+          <div className="rounded-none border border-foreground-tertiary/20 bg-background-secondary p-5 shadow-2xl backdrop-blur-md">
+            <h3 className="mb-3 text-xs font-accent uppercase tracking-widest text-foreground-tertiary">Save Highlight Passage</h3>
             <div className="mb-4">
               <textarea
                 value={pendingQuote.text}
                 onChange={(e) => setPendingQuote({ ...pendingQuote, text: e.target.value })}
-                className="w-full min-h-[90px] max-h-32 rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm font-serif italic text-foreground outline-none focus:border-primary/50 resize-y"
+                className="w-full min-h-[90px] max-h-32 rounded-none border border-foreground-tertiary/30 bg-background px-4 py-3 text-sm font-serif italic text-foreground outline-none focus:border-indigo resize-y"
               />
             </div>
             <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
               <div className="flex gap-2 items-center">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mr-1">Color</span>
-                {['#F7F3ED', '#E3E9F1', '#E8F1E3', '#F1E3E8', '#F1EBE3'].map(color => (
+                <span className="text-[10px] font-accent uppercase tracking-widest text-foreground-tertiary mr-1">Color</span>
+                {['#F5F1E8', '#E3E9F1', '#E8F1E3', '#F1E3E8', '#F1EBE3'].map(color => (
                   <button
                     key={color}
                     onClick={() => setQuoteColor(color)}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform ${quoteColor === color ? 'border-primary scale-110 shadow-sm' : 'border-transparent hover:scale-110'}`}
+                    className={`w-6 h-6 rounded-full border-2 transition-transform ${quoteColor === color ? 'border-indigo scale-110 shadow-sm' : 'border-transparent hover:scale-110'}`}
                     style={{ backgroundColor: color }}
                     aria-label={`Select color ${color}`}
                   />
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-end">
                 <button 
                   onClick={() => setPendingQuote(null)}
-                  className="rounded-full px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+                  className="rounded-none px-4 py-2 text-xs font-sans font-medium text-foreground-tertiary hover:text-foreground"
                 >
                   Cancel
                 </button>
@@ -324,7 +319,7 @@ export default function EbookReader() {
                     
                     setPendingQuote(null);
                   }}
-                  className="rounded-full bg-[#3B4A6B] px-5 py-2 text-xs font-medium text-[#FAF8F4] shadow-sm transition-transform hover:-translate-y-0.5 active:scale-95"
+                  className="rounded-none bg-indigo px-5 py-2 text-xs font-sans font-medium text-background shadow-md transition hover:bg-clay"
                 >
                   Save Quote
                 </button>
@@ -334,27 +329,37 @@ export default function EbookReader() {
         </div>
       )}
 
-      <div className="absolute inset-0 pt-16 pb-14 bg-background flex justify-center">
+      {/* Primary Rendition Area */}
+      <div className="absolute inset-0 pt-16 pb-20 bg-background flex justify-center">
         <div ref={viewerRef} className="h-full w-full max-w-3xl" />
       </div>
 
+      {/* Navigation Arrows */}
       <button 
         onClick={prev} 
-        className="absolute bottom-14 left-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity"
+        className="absolute bottom-20 left-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity"
+        aria-label="Previous Page"
       >
-        <ChevronLeft size={36} className="text-muted-foreground/50 hover:text-foreground/70" />
+        <ArrowLeft size={32} weight="thin" className="text-foreground-tertiary hover:text-foreground transition-colors" />
       </button>
       
       <button 
         onClick={next} 
-        className="absolute bottom-14 right-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity"
+        className="absolute bottom-20 right-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity"
+        aria-label="Next Page"
       >
-        <ChevronRight size={36} className="text-muted-foreground/50 hover:text-foreground/70" />
+        <ArrowRight size={32} weight="thin" className="text-foreground-tertiary hover:text-foreground transition-colors" />
       </button>
 
-      <div className="absolute bottom-0 left-0 right-0 z-50 border-t border-border/60 bg-background/80 backdrop-blur-md px-6 py-3 flex items-center justify-between text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-        <span>{readingProgress.total > 0 ? `Est. Page ${readingProgress.page} of ${readingProgress.total}` : 'Chapter Progress'}</span>
-        <span>{readingProgress.percentage}%</span>
+      {/* Bottom Progress Controls Panel */}
+      <div className="fixed bottom-0 left-0 right-0 h-20 bg-background/95 backdrop-blur border-t border-foreground-tertiary/20 flex flex-col gap-3 p-4 z-50 justify-center">
+        <div className="w-full h-1 bg-foreground-tertiary/20 rounded-full overflow-hidden">
+          <div className="h-full bg-moss transition-all duration-300" style={{ width: `${readingProgress.percentage}%` }} />
+        </div>
+        <div className="flex justify-between items-center text-[11px] font-accent uppercase tracking-widest text-foreground-tertiary">
+          <span>{readingProgress.total > 0 ? `Est. Page ${readingProgress.page} of ${readingProgress.total}` : 'Chapter Progress'}</span>
+          <span>{readingProgress.percentage}%</span>
+        </div>
       </div>
     </div>
   );
