@@ -234,7 +234,7 @@ export default function LibraryDashboard() {
                 <button
                   key={type}
                   onClick={() => setFilterType(type)}
-                  className={`px-5 py-2 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 ${
+                  className={`h-9 px-5 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 inline-flex items-center justify-center ${
                     filterType === type 
                       ? 'border-indigo bg-indigo text-background' 
                       : 'border-foreground-tertiary/20 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
@@ -255,7 +255,7 @@ export default function LibraryDashboard() {
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="px-4 py-2 text-xs font-sans font-medium uppercase tracking-wider bg-background-secondary border border-foreground-tertiary/20 rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer"
+              className="h-9 px-4 text-xs font-sans font-medium uppercase tracking-wider bg-background-secondary border border-foreground-tertiary/20 rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer"
             >
               <option value="all">All Time</option>
               <option value="thisMonth">This Month</option>
