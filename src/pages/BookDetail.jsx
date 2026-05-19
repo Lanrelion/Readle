@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Trash, PencilSimple, CheckCircle, BookOpen, Chat } from '@phosphor-icons/react';
-import { db } from '../services/db';
+import { ArrowLeft, Trash, PencilSimple, CheckCircle, BookOpen } from '@phosphor-icons/react';
+import { db, deleteBook, deleteQuote } from '../services/db';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
 
@@ -91,7 +91,7 @@ export default function BookDetail() {
 
   const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this book?')) {
-      await db.books.delete(id);
+      await deleteBook(id);
       navigate('/');
     }
   };
@@ -104,19 +104,17 @@ export default function BookDetail() {
         ...book.progress,
         type: book.progress?.type || 'pages', 
         value: book.progress?.type === 'percentage' ? 100 : `${book.metadata?.totalPages || '?'}/${book.metadata?.totalPages || '?'}` 
-      }
+      },
+      updatedAt: new Date().toISOString(),
+      synced: 0
     });
   };
 
   const handleUpdateProgress = async () => {
     const isPercent = book.progress?.type === 'percentage';
-    let formattedVal = newProgress;
-    
-    if (isPercent) {
-      formattedVal = Math.min(100, Math.max(0, parseInt(newProgress) || 0));
-    } else {
-      formattedVal = `${newProgress}/${book.metadata?.totalPages || '?'}`;
-    }
+    const formattedVal = isPercent
+      ? Math.min(100, Math.max(0, parseInt(newProgress) || 0))
+      : `${newProgress}/${book.metadata?.totalPages || '?'}`;
 
     await db.books.update(id, {
       progress: { 
@@ -124,7 +122,9 @@ export default function BookDetail() {
         type: book.progress?.type || 'pages', 
         value: formattedVal 
       },
-      status: 'reading' // Auto-update status if updating progress
+      status: 'reading', // Auto-update status if updating progress
+      updatedAt: new Date().toISOString(),
+      synced: 0
     });
     setIsEditingProgress(false);
     setNewProgress('');
@@ -137,7 +137,8 @@ export default function BookDetail() {
       bookId: id,
       text: quoteText.trim(),
       color: quoteColor,
-      dateSaved: new Date().toISOString()
+      dateSaved: new Date().toISOString(),
+      synced: 0
     });
     
     // Save Quote Toast notification via GSAP could go here
@@ -147,7 +148,7 @@ export default function BookDetail() {
 
   const handleDeleteQuote = async (quoteId) => {
     if (confirm('Delete this quote?')) {
-      await db.quotes.delete(quoteId);
+      await deleteQuote(quoteId);
     }
   };
 
@@ -197,8 +198,8 @@ export default function BookDetail() {
               )}
             </div>
             
-            {/* Ebook Read CTA or File Attached States */}
-            {book.type === 'ebook' && (
+            {/* Ebook/PDF Read CTA or File Attached States */}
+            {(book.type === 'ebook' || book.type === 'pdf') && (
               book.fileBlob ? (
                 <button 
                   onClick={() => navigate(`/read/${book.id}`)}
@@ -229,7 +230,7 @@ export default function BookDetail() {
                   {getStatusLabel(book.status)}
                 </span>
                 <span className="px-3 py-0.5 text-[11px] font-accent uppercase tracking-widest bg-background-secondary border border-foreground-tertiary/20 text-foreground-secondary">
-                  {book.type === 'ebook' ? 'Ebook' : 'Physical'}
+                  {book.type === 'ebook' ? 'Ebook' : book.type === 'pdf' ? 'PDF' : 'Physical'}
                 </span>
               </div>
               <h2 className="text-4xl font-serif font-normal text-foreground leading-snug">{book.title}</h2>

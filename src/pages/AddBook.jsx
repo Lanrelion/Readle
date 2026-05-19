@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, UploadSimple, Camera, Palette } from '@phosphor-icons/react';
+import { CheckCircle, UploadSimple, Camera } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
 import Tesseract from 'tesseract.js';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
+import { loadPDF, getPDFMetadata } from '../services/pdfService';
 
 export default function AddBook() {
   const navigate = useNavigate();
@@ -89,37 +90,54 @@ export default function AddBook() {
 
     setIsLoading(true);
     try {
-      const book = ePub(file);
-      const metadata = await book.loaded.metadata;
+      const isPDFFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       
-      let coverBase64 = null;
-      try {
-        const coverUrl = await book.coverUrl();
-        if (coverUrl) {
-          const response = await fetch(coverUrl);
-          const blob = await response.blob();
-          coverBase64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-          URL.revokeObjectURL(coverUrl);
-        }
-      } catch (err) {
-        console.warn("Could not extract cover", err);
-      }
+      if (isPDFFile) {
+        const pdf = await loadPDF(file);
+        const metadata = await getPDFMetadata(pdf);
 
-      setFileBlob(file);
-      setFormData(prev => ({
-        ...prev,
-        title: metadata.title || prev.title,
-        author: metadata.creator || prev.author,
-        type: 'ebook',
-        cover: coverBase64
-      }));
-      setEntryMode('manual');
+        setFileBlob(file);
+        setFormData(prev => ({
+          ...prev,
+          title: metadata.title && metadata.title !== 'Untitled PDF' ? metadata.title : file.name.replace(/\.[^/.]+$/, ""),
+          author: metadata.author && metadata.author !== 'Unknown' ? metadata.author : 'Unknown Author',
+          type: 'pdf',
+          totalPages: metadata.numPages || ''
+        }));
+        setEntryMode('manual');
+      } else {
+        const book = ePub(file);
+        const metadata = await book.loaded.metadata;
+        
+        let coverBase64 = null;
+        try {
+          const coverUrl = await book.coverUrl();
+          if (coverUrl) {
+            const response = await fetch(coverUrl);
+            const blob = await response.blob();
+            coverBase64 = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            URL.revokeObjectURL(coverUrl);
+          }
+        } catch (err) {
+          console.warn("Could not extract cover", err);
+        }
+
+        setFileBlob(file);
+        setFormData(prev => ({
+          ...prev,
+          title: metadata.title || prev.title,
+          author: metadata.creator || prev.author,
+          type: 'ebook',
+          cover: coverBase64
+        }));
+        setEntryMode('manual');
+      }
     } catch (error) {
-      alert("Failed to parse EPUB file. Please try again or enter manually.");
+      alert("Failed to parse file. Please try again or enter manually.");
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -145,7 +163,9 @@ export default function AddBook() {
         progress: formData.status === 'completed'
           ? { type: 'pages', value: `${formData.totalPages}/${formData.totalPages}` }
           : { type: 'percentage', value: 0 },
-        fileBlob: fileBlob
+        fileBlob: fileBlob,
+        updatedAt: new Date().toISOString(),
+        synced: 0
       };
       
       await db.books.add(newBook);
@@ -168,7 +188,7 @@ export default function AddBook() {
         {/* Literary Header */}
         <header className="flex flex-col gap-4 py-6 border-b border-foreground-tertiary/10 mb-8">
           <h1 className="text-5xl font-serif font-normal text-foreground leading-tight">Add Volume</h1>
-          <p className="text-foreground-secondary font-sans text-base max-w-md">Catalog a new physical companion or upload a digital EPUB manuscript.</p>
+          <p className="text-foreground-secondary font-sans text-base max-w-md">Catalog a new physical companion or upload a digital EPUB or PDF manuscript.</p>
         </header>
 
         {/* Sharp Editorial Segmented Mode Toggles */}
@@ -197,7 +217,7 @@ export default function AddBook() {
           </button>
         </div>
 
-        {/* EPUB Drag & Drop Upload Frame */}
+        {/* EPUB / PDF Drag & Drop Upload Frame */}
         {entryMode === 'upload' && (
           <div 
             className="rounded-none border border-dashed border-foreground-tertiary/40 p-14 text-center bg-background-secondary space-y-6"
@@ -205,13 +225,13 @@ export default function AddBook() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center bg-indigo/10 text-indigo rounded-none">
               <UploadSimple size={32} weight="thin" />
             </div>
-            <h3 className="text-xl font-serif font-normal text-foreground">Upload EPUB file</h3>
+            <h3 className="text-xl font-serif font-normal text-foreground">Upload Manuscript</h3>
             <p className="text-sm text-foreground-secondary max-w-sm mx-auto">
-              Drop your manuscript here or click below to parse the cover and table of contents automatically.
+              Drop your EPUB or PDF here or click below to parse details automatically.
             </p>
             <input 
               type="file" 
-              accept=".epub"
+              accept=".epub,.pdf"
               ref={fileInputRef}
               className="hidden"
               onChange={handleFileUpload}
@@ -222,7 +242,7 @@ export default function AddBook() {
               disabled={isLoading}
               className="inline-flex items-center justify-center rounded-none bg-indigo px-6 py-3.5 text-sm font-sans font-medium text-background hover:bg-clay transition duration-300 disabled:opacity-50"
             >
-              {isLoading ? "Parsing Manuscript..." : "Select EPUB Manuscript"}
+              {isLoading ? "Parsing Manuscript..." : "Select Manuscript"}
             </button>
           </div>
         )}
@@ -324,10 +344,11 @@ export default function AddBook() {
                     name="type" 
                     value={formData.type} 
                     onChange={handleChange} 
-                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo"
+                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer"
                   >
                     <option value="physical">Physical Companion</option>
-                    <option value="ebook">Digital Ebook</option>
+                    <option value="ebook">Ebook (EPUB)</option>
+                    <option value="pdf">PDF Document</option>
                   </select>
                 </div>
                 <div>

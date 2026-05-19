@@ -1,16 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Books, MagnifyingGlass, BookOpen, Check } from '@phosphor-icons/react';
+import { Books, MagnifyingGlass } from '@phosphor-icons/react';
 import { db, seedMockData } from '../services/db';
 import BookCard from '../components/BookCard';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
+import { supabase } from '../services/supabase';
+import { AuthModal } from '../components/AuthModal';
 
 export default function LibraryDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('statusFilter') || 'all');
+  const [filterType, setFilterType] = useState(() => localStorage.getItem('formatFilter') || 'all');
+  const [dateFilter, setDateFilter] = useState(() => localStorage.getItem('dateFilter') || 'all');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [user, setUser] = useState(null);
   const dashboardRef = useRef(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Seed mock data once on mount
   useEffect(() => {
@@ -29,24 +48,75 @@ export default function LibraryDashboard() {
     return () => ctx.revert();
   }, []);
 
+  // Sync filters to localStorage
+  useEffect(() => {
+    localStorage.setItem('statusFilter', filterStatus);
+  }, [filterStatus]);
+
+  useEffect(() => {
+    localStorage.setItem('formatFilter', filterType);
+  }, [filterType]);
+
+  useEffect(() => {
+    localStorage.setItem('dateFilter', dateFilter);
+  }, [dateFilter]);
+
   // Reactive query to IndexedDB
   const books = useLiveQuery(
     async () => {
-      let collection = db.books.toCollection();
+      let results;
+      const now = new Date();
       
-      // Filter by type
-      if (filterType !== 'all') {
-        collection = db.books.where('type').equals(filterType);
+      // Determine date ranges
+      let startDate = null;
+      let endDate = null;
+      let isYearFilter = false;
+
+      if (dateFilter === 'thisMonth') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else if (dateFilter === 'last3Months') {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      } else if (/^\d{4}$/.test(dateFilter)) {
+        const year = parseInt(dateFilter, 10);
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year + 1, 0, 1);
+        isYearFilter = true;
+      }
+
+      // Query IndexedDB using Dexie indexes where possible
+      if (startDate) {
+        if (isYearFilter) {
+          results = await db.books
+            .where('dateAdded')
+            .between(startDate.toISOString(), endDate.toISOString(), true, false)
+            .toArray();
+        } else {
+          results = await db.books
+            .where('dateAdded')
+            .aboveOrEqual(startDate.toISOString())
+            .toArray();
+        }
+      } else if (filterType !== 'all') {
+        results = await db.books
+          .where('type').equals(filterType)
+          .toArray();
+      } else {
+        results = await db.books.toArray();
+      }
+
+      // In-memory post-filtering
+      
+      // 1. Filter by format (type) if it wasn't filtered by database query
+      if (startDate && filterType !== 'all') {
+        results = results.filter(b => b.type === filterType);
       }
       
-      let results = await collection.toArray();
-      
-      // Filter by status (in memory since we might have used the index for 'type')
+      // 2. Filter by status
       if (filterStatus !== 'all') {
         results = results.filter(b => b.status === filterStatus);
       }
       
-      // Search by title or author
+      // 3. Search by title or author
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         results = results.filter(b => 
@@ -62,7 +132,7 @@ export default function LibraryDashboard() {
         return new Date(b.dateAdded) - new Date(a.dateAdded);
       });
     },
-    [searchQuery, filterStatus, filterType],
+    [searchQuery, filterStatus, filterType, dateFilter],
     [] // Default value before loading
   );
 
@@ -79,20 +149,42 @@ export default function LibraryDashboard() {
     { value: 'completed', label: 'Finished' },
   ];
 
+  // Generate year options from 2020 to current year
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let year = currentYear; year >= 2020; year--) {
+    yearOptions.push(
+      <option key={year} value={year.toString()}>
+        {year}
+      </option>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-indigo/20 lg:pl-64 pb-28 lg:pb-12">
       {/* Shared Responsive Sidebar/Bottom-Bar Nav */}
       <Navigation />
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
 
       {/* Main Page Sandbox */}
       <div ref={dashboardRef} className="container mx-auto px-6 py-8 lg:px-12 max-w-7xl">
         
         {/* Page Hero Header */}
         <header className="flex flex-col gap-4 py-6 border-b border-foreground-tertiary/10 mb-8">
-          <div className="flex justify-between items-baseline">
+          <div className="flex justify-between items-center">
             <span className="text-xs font-accent uppercase tracking-widest text-foreground-tertiary">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="px-4 py-2 bg-indigo hover:bg-clay text-background text-xs font-sans font-medium uppercase tracking-wider transition duration-300 rounded-none shadow-sm cursor-pointer"
+            >
+              {user ? 'Account' : 'Sign In to Sync'}
+            </button>
           </div>
           
           <h1 className="text-5xl font-serif font-normal text-foreground leading-tight">
@@ -121,7 +213,7 @@ export default function LibraryDashboard() {
         </section>
 
         {/* Custom Search bar & Format Controls */}
-        <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           {/* Muted Translucent Search Bar */}
           <div className="relative w-full max-w-md">
             <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-tertiary" size={18} weight="thin" />
@@ -134,21 +226,42 @@ export default function LibraryDashboard() {
             />
           </div>
 
-          {/* Ebook vs Physical Selectors */}
-          <div className="flex gap-2">
-            {['all', 'ebook', 'physical'].map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-5 py-2 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 ${
-                  filterType === type 
-                    ? 'border-indigo bg-indigo text-background' 
-                    : 'border-foreground-tertiary/20 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
-                }`}
-              >
-                {type === 'all' ? 'All Formats' : type}
-              </button>
-            ))}
+          {/* Format & Date Filters */}
+          <div className="flex flex-wrap gap-4 items-center">
+            {/* Format Selectors */}
+            <div className="flex gap-2">
+              {['all', 'ebook', 'pdf', 'physical'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setFilterType(type)}
+                  className={`px-5 py-2 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 ${
+                    filterType === type 
+                      ? 'border-indigo bg-indigo text-background' 
+                      : 'border-foreground-tertiary/20 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
+                  }`}
+                >
+                  {type === 'all' 
+                    ? 'All Formats' 
+                    : type === 'ebook' 
+                      ? 'Ebooks' 
+                      : type === 'pdf' 
+                        ? 'PDFs' 
+                        : 'Physical'}
+                </button>
+              ))}
+            </div>
+
+            {/* Date Filter Select */}
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-4 py-2 text-xs font-sans font-medium uppercase tracking-wider bg-background-secondary border border-foreground-tertiary/20 rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer"
+            >
+              <option value="all">All Time</option>
+              <option value="thisMonth">This Month</option>
+              <option value="last3Months">Last 3 Months</option>
+              {yearOptions}
+            </select>
           </div>
         </div>
 

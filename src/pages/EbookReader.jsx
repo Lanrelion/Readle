@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, ArrowRight, Gear, X, Palette } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, Gear, X } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
 import { useTheme } from '../hooks/useTheme';
-import gsap from 'gsap';
+import { PDFReader } from '../components/PDFReader';
+
 
 export default function EbookReader() {
   const { id } = useParams();
@@ -14,7 +15,6 @@ export default function EbookReader() {
   const renditionRef = useRef(null);
   const bookRef = useRef(null);
   
-  const [location, setLocation] = useState(null);
   const [readingProgress, setReadingProgress] = useState({ page: 0, total: 0, percentage: 0 });
   const [isReady, setIsReady] = useState(false);
   const [showControls, setShowControls] = useState(false);
@@ -27,13 +27,21 @@ export default function EbookReader() {
 
   useEffect(() => {
     if (!bookData || !bookData.fileBlob || !viewerRef.current) return;
+    
+    // Bypass ePub initialization for PDF files
+    const isPDF = bookData.type === 'pdf' || 
+                  bookData.fileBlob?.type === 'application/pdf' || 
+                  bookData.title?.toLowerCase().endsWith('.pdf');
+    if (isPDF) return;
+
     if (bookRef.current) return; // Already initialized
 
     const fileReader = new FileReader();
-    fileReader.onload = (e) => {
+
+    fileReader.onload = () => {
       if (bookRef.current) return; 
 
-      const bookDataArrayBuffer = e.target.result;
+      const bookDataArrayBuffer = fileReader.result;
       const epub = ePub(bookDataArrayBuffer);
       bookRef.current = epub;
 
@@ -48,7 +56,6 @@ export default function EbookReader() {
 
       // Update progress using chapter spine index mapping
       const updateProgress = (loc) => {
-        setLocation(loc);
         
         let percentage = null;
         let page = 0;
@@ -64,7 +71,10 @@ export default function EbookReader() {
 
         setReadingProgress({ page, total, percentage: percentage || 0 });
 
-        const updateData = {};
+        const updateData = {
+          updatedAt: new Date().toISOString(),
+          synced: 0
+        };
         if (bookData.status !== 'completed') {
           updateData.status = 'reading';
         }
@@ -93,18 +103,17 @@ export default function EbookReader() {
           const bookQuotes = await db.quotes.where('bookId').equals(id).toArray();
           bookQuotes.forEach(q => {
             if (q.cfi) {
-              rendition.annotations.highlight(q.cfi, {}, (e) => {});
+              rendition.annotations.highlight(q.cfi, {}, () => {});
             }
           });
-        } catch (e) {
-          console.warn('Could not apply highlights', e);
+        } catch {
+          console.warn('Could not apply highlights');
         }
       });
 
       rendition.on('relocated', updateProgress);
       
-      // Text selection for quote generation
-      rendition.on('selected', (cfiRange, contents) => {
+      rendition.on('selected', (cfiRange) => {
         epub.getRange(cfiRange).then(range => {
           if (range) {
             const text = range.toString();
@@ -134,7 +143,7 @@ export default function EbookReader() {
 
         // Double-tap expands to sentence
         let lastTap = 0;
-        doc.addEventListener('touchend', (e) => {
+        doc.addEventListener('touchend', () => {
           const currentTime = new Date().getTime();
           const tapLength = currentTime - lastTap;
           if (tapLength < 500 && tapLength > 0) {
@@ -161,7 +170,9 @@ export default function EbookReader() {
               selection.modify("extend", "forward", "sentence");
               const event = new MouseEvent('mouseup', { view: win, bubbles: true, cancelable: true });
               doc.dispatchEvent(event);
-            } catch (err) {}
+            } catch {
+              // Ignore selection errors on unsupported elements
+            }
           }
         });
       });
@@ -181,6 +192,7 @@ export default function EbookReader() {
     };
     
     fileReader.readAsArrayBuffer(bookData.fileBlob);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookData?.fileBlob]);
 
   // Clean up ePub on unmount
@@ -223,6 +235,38 @@ export default function EbookReader() {
       </div>
     );
   }
+
+  // Detect file type
+  const isPDF = bookData.type === 'pdf' || 
+                bookData.fileBlob?.type === 'application/pdf' || 
+                bookData.title?.toLowerCase().endsWith('.pdf');
+
+  // Render PDF reader
+  if (isPDF) {
+    const handleProgressUpdate = async (currentPage, totalPages, percentage) => {
+      const updateData = {
+        status: currentPage === totalPages ? 'completed' : 'reading',
+        progress: {
+          type: 'percentage',
+          value: percentage,
+          currentPage,
+          totalPages
+        },
+        updatedAt: new Date().toISOString(),
+        synced: 0
+      };
+      await db.books.update(id, updateData);
+    };
+
+    return (
+      <PDFReader
+        bookId={id}
+        fileBlob={bookData.fileBlob}
+        onProgressUpdate={handleProgressUpdate}
+      />
+    );
+  }
+
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-background text-foreground font-sans z-50">
@@ -308,13 +352,14 @@ export default function EbookReader() {
                       text: pendingQuote.text,
                       color: quoteColor,
                       cfi: pendingQuote.cfiRange,
-                      dateSaved: new Date().toISOString()
+                      dateSaved: new Date().toISOString(),
+                      synced: 0
                     });
                     
                     try {
-                      renditionRef.current?.annotations.highlight(pendingQuote.cfiRange, {}, (e) => {});
-                    } catch(e) {
-                      console.warn('Could not apply highlight', e);
+                      renditionRef.current?.annotations.highlight(pendingQuote.cfiRange, {}, () => {});
+                    } catch {
+                      console.warn('Could not apply highlight');
                     }
                     
                     setPendingQuote(null);

@@ -1,6 +1,6 @@
 import { Book, BookOpen, Check } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import gsap from 'gsap';
 
 export default function BookCard({ book }) {
@@ -44,6 +44,24 @@ export default function BookCard({ book }) {
       duration: 0.3,
       ease: 'power2.inOut',
     });
+  };
+
+  const getPercentageValue = () => {
+    if (!book.progress) return 0;
+    if (book.progress.type === 'percentage') {
+      return book.progress.value;
+    }
+    if (book.progress.type === 'pages' && typeof book.progress.value === 'string') {
+      const parts = book.progress.value.split('/');
+      if (parts.length === 2) {
+        const current = parseInt(parts[0], 10);
+        const total = parseInt(parts[1], 10);
+        if (!isNaN(current) && !isNaN(total) && total > 0) {
+          return Math.round((current / total) * 100);
+        }
+      }
+    }
+    return book.status === 'completed' ? 100 : 0;
   };
 
   return (
@@ -98,7 +116,7 @@ export default function BookCard({ book }) {
               {book.status === 'completed' && <Check size={14} weight="thin" className="text-clay" />}
               {book.status === 'wantToRead' && <Book size={14} weight="thin" className="text-foreground-tertiary" />}
               <span className="text-xs text-foreground-tertiary uppercase tracking-wider font-accent">
-                {book.type === 'ebook' ? 'Ebook' : 'Physical'}
+                {book.type === 'ebook' ? 'Ebook' : book.type === 'pdf' ? 'PDF' : 'Physical'}
               </span>
             </div>
             
@@ -116,9 +134,7 @@ export default function BookCard({ book }) {
                   <div 
                     className="h-full bg-moss transition-all duration-700 ease-out"
                     style={{ 
-                      width: book.progress.type === 'percentage' 
-                        ? `${book.progress.value}%` 
-                        : (book.status === 'completed' ? '100%' : '0%') 
+                      width: `${getPercentageValue()}%`
                     }}
                   />
                 </div>

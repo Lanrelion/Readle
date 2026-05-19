@@ -1,4 +1,4 @@
-// src/components/OfflineBanner.jsx
+// src/components/OfflineBanner.tsx
 import { useState, useEffect } from 'react';
 
 export function OfflineBanner() {
@@ -12,8 +12,7 @@ export function OfflineBanner() {
       setIsOnline(true);
       // Show "Back online" banner for 3 seconds
       setShowBanner(true);
-      const timer = setTimeout(() => setShowBanner(false), 3000);
-      return () => clearTimeout(timer);
+      setTimeout(() => setShowBanner(false), 3000);
     };
 
     const handleOffline = () => {
@@ -36,23 +35,17 @@ export function OfflineBanner() {
     <div
       className={`
         fixed top-0 left-0 right-0
-        bg-moss text-background px-4 py-2.5
-        text-center text-xs font-sans tracking-wide font-medium uppercase
+        bg-moss text-white px-4 py-2
+        text-center text-sm font-sans
         transition-all duration-300 ease-in-out
-        z-[9999] border-b border-moss/20 shadow-md
+        z-50
         ${showBanner ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}
       `}
     >
       {isOnline ? (
-        <span className="flex items-center justify-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-background animate-pulse" />
-          Back online — Syncing book collections
-        </span>
+        <span>✓ Back online — syncing data</span>
       ) : (
-        <span className="flex items-center justify-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-200 animate-ping" />
-          Offline — Reading locally from Rice Paper cache
-        </span>
+        <span>⚠ Offline — reading locally from your device</span>
       )}
     </div>
   );

@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../services/db';
-import { Quotes, Trash, ArrowLeft } from '@phosphor-icons/react';
-import { useNavigate, Link } from 'react-router-dom';
+import { db, deleteQuote } from '../services/db';
+import { Quotes, Trash } from '@phosphor-icons/react';
+import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
 
 export default function QuotesList() {
-  const navigate = useNavigate();
   const [selectedBookFilter, setSelectedBookFilter] = useState('all');
   const boardRef = useRef(null);
 
@@ -43,7 +42,7 @@ export default function QuotesList() {
 
   const handleDelete = async (id) => {
     if (confirm('Delete this quote?')) {
-      await db.quotes.delete(id);
+      await deleteQuote(id);
     }
   };
 

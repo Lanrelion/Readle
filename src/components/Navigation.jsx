@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { BookOpen, Plus, Quotes, Sun, Moon } from '@phosphor-icons/react';
 import { useTheme } from '../hooks/useTheme';
-import { useRef } from 'react';
+
 import gsap from 'gsap';
 
 export default function Navigation() {
