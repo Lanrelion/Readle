@@ -83,20 +83,47 @@ export function AuthModal({ isOpen, onClose }) {
   };
 
   const handleSignOut = async () => {
+    console.log('[Auth] Starting sign out process...');
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn('[Auth] Supabase signOut error:', error);
+      try {
+        await supabase.auth.signOut();
+        console.log('[Auth] Supabase signOut completed');
+      } catch (error) {
+        console.warn('[Auth] Supabase signOut error:', error);
+      }
+      
+      try {
+        localStorage.removeItem('skippedAuth');
+        // Fallback: manually delete any supabase session keys from localStorage
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.includes('supabase'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key);
+          console.log('[Auth] Removed localStorage key:', key);
+        });
+        console.log('[Auth] Local storage cleared');
+      } catch (error) {
+        console.warn('[Auth] Local storage cleanup error:', error);
+      }
+
+      try {
+        await clearLocalDatabase();
+        console.log('[Auth] Local database cleared');
+      } catch (error) {
+        console.warn('[Auth] Database clear error:', error);
+      }
+      
+      console.log('[Auth] Sign out complete, reloading page...');
+      window.location.reload();
+    } catch (globalError) {
+      console.error('[Auth] Global sign out handler crash:', globalError);
+      window.location.reload();
     }
-    
-    try {
-      localStorage.removeItem('skippedAuth');
-      await clearLocalDatabase();
-    } catch (error) {
-      console.warn('[Auth] Database clear error:', error);
-    }
-    
-    window.location.reload(); // Refresh to clear local state
   };
 
   const handleSkip = () => {
