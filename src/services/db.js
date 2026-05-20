@@ -15,6 +15,13 @@ db.version(2).stores({
   deletedRecords: 'id, type'
 });
 
+db.version(3).stores({
+  books: 'id, type, title, author, status, dateAdded, synced',
+  quotes: 'id, bookId, dateSaved, synced',
+  ebookProgress: 'id, bookId, synced',
+  deletedRecords: 'id, type'
+});
+
 export const seedMockData = async () => {
   const count = await db.books.count();
   if (count > 0) return;
