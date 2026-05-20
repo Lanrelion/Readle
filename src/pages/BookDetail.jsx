@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Trash, PencilSimple, CheckCircle, BookOpen } from '@phosphor-icons/react';
 import { db, deleteBook, deleteQuote } from '../services/db';
 import Navigation from '../components/Navigation';
+import { fullSync } from '../services/syncService';
 import gsap from 'gsap';
 
 export default function BookDetail() {
@@ -92,6 +93,7 @@ export default function BookDetail() {
   const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this book?')) {
       await deleteBook(id);
+      fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
       navigate('/');
     }
   };
@@ -108,6 +110,7 @@ export default function BookDetail() {
       updatedAt: new Date().toISOString(),
       synced: 0
     });
+    fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
   };
 
   const handleUpdateProgress = async () => {
@@ -126,6 +129,7 @@ export default function BookDetail() {
       updatedAt: new Date().toISOString(),
       synced: 0
     });
+    fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
     setIsEditingProgress(false);
     setNewProgress('');
   };
@@ -140,6 +144,7 @@ export default function BookDetail() {
       dateSaved: new Date().toISOString(),
       synced: 0
     });
+    fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
     
     // Save Quote Toast notification via GSAP could go here
     setQuoteText('');
@@ -149,6 +154,7 @@ export default function BookDetail() {
   const handleDeleteQuote = async (quoteId) => {
     if (confirm('Delete this quote?')) {
       await deleteQuote(quoteId);
+      fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
     }
   };
 

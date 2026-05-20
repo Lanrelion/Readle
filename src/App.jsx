@@ -9,7 +9,7 @@ import { useTheme } from './hooks/useTheme';
 import { OfflineBanner } from './components/OfflineBanner';
 import { AuthModal } from './components/AuthModal';
 import { supabase } from './services/supabase';
-import { fullSync, syncLocalToCloud } from './services/syncService';
+import { fullSync } from './services/syncService';
 import './App.css';
 
 function App() {
@@ -64,7 +64,7 @@ function App() {
     const interval = setInterval(() => {
       if (navigator.onLine) {
         console.log('[App] Running background sync...');
-        syncLocalToCloud(); // Only push local changes
+        fullSync(); // Run bidirectional sync to pull new items as well as push local items
       }
     }, 5 * 60 * 1000); // 5 minutes
 

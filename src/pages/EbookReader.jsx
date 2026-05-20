@@ -6,6 +6,7 @@ import { db } from '../services/db';
 import ePub from 'epubjs';
 import { useTheme } from '../hooks/useTheme';
 import { PDFReader } from '../components/PDFReader';
+import { syncLocalToCloud } from '../services/syncService';
 
 
 export default function EbookReader() {
@@ -93,6 +94,7 @@ export default function EbookReader() {
         }
 
         db.books.update(id, updateData);
+        syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
       };
 
       const savedCfi = bookData.progress?.cfi || (bookData.progress?.type === 'cfi' ? bookData.progress.value : undefined);
@@ -256,6 +258,7 @@ export default function EbookReader() {
         synced: 0
       };
       await db.books.update(id, updateData);
+      syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
     };
 
     return (

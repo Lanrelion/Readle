@@ -7,6 +7,7 @@ import Tesseract from 'tesseract.js';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
 import { loadPDF, getPDFMetadata } from '../services/pdfService';
+import { fullSync } from '../services/syncService';
 
 export default function AddBook() {
   const navigate = useNavigate();
@@ -169,6 +170,7 @@ export default function AddBook() {
       };
       
       await db.books.add(newBook);
+      fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
       navigate('/');
     } catch (err) {
       alert("Error saving book: " + err.message);
