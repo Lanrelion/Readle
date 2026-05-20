@@ -10,14 +10,35 @@ import { OfflineBanner } from './components/OfflineBanner';
 import { AuthModal } from './components/AuthModal';
 import { supabase } from './services/supabase';
 import { fullSync } from './services/syncService';
+import { clearLocalDatabase } from './services/db';
 import './App.css';
 
 function App() {
   useTheme(); // Initialize theme globally
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState(null);
+  const [isPurging, setIsPurging] = useState(() => localStorage.getItem('needsDBClear') === 'true');
+
+  // Purge database on boot if needed (guarantees no locks from active React component trees)
+  useEffect(() => {
+    if (isPurging) {
+      console.log('[App] Purge flag detected. Wiping IndexedDB...');
+      clearLocalDatabase()
+        .then(() => {
+          localStorage.removeItem('needsDBClear');
+          console.log('[App] IndexedDB local database wiped successfully');
+          setIsPurging(false);
+        })
+        .catch((err) => {
+          console.error('[App] Failed to clear IndexedDB:', err);
+          localStorage.removeItem('needsDBClear');
+          setIsPurging(false);
+        });
+    }
+  }, [isPurging]);
 
   useEffect(() => {
+    if (isPurging) return;
     let timer = null;
 
     // Check if user is signed in
@@ -50,10 +71,11 @@ function App() {
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isPurging]);
 
   // Background Sync (Every 5 Minutes)
   useEffect(() => {
+    if (isPurging) return;
     // Only sync if user is signed in
     if (!user) return;
 
@@ -69,7 +91,21 @@ function App() {
     }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isPurging]);
+
+  if (isPurging) {
+    return (
+      <div className="min-h-screen bg-background text-foreground font-sans flex flex-col items-center justify-center p-6 select-none">
+        <div className="text-center space-y-6 max-w-sm">
+          <div className="w-10 h-10 border-2 border-indigo border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="space-y-2">
+            <h3 className="font-serif text-xl font-normal tracking-wide">Purging Session Data</h3>
+            <p className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">Clearing local library offline files...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

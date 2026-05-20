@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { clearLocalDatabase } from '../services/db';
 import { X, CloudArrowUp, SignOut, EnvelopeSimple, Lock } from '@phosphor-icons/react';
 
 export function AuthModal({ isOpen, onClose }) {
@@ -85,16 +84,23 @@ export function AuthModal({ isOpen, onClose }) {
   const handleSignOut = async () => {
     console.log('[Auth] Starting sign out process...');
     try {
+      // Trigger Supabase signOut but do not block reload if it hangs
       try {
-        await supabase.auth.signOut();
-        console.log('[Auth] Supabase signOut completed');
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase signOut timeout')), 600))
+        ]);
+        console.log('[Auth] Supabase signOut completed/initiated');
       } catch (error) {
-        console.warn('[Auth] Supabase signOut error:', error);
+        console.warn('[Auth] Supabase signOut timed out or failed:', error);
       }
       
+      // Schedule DB clear on next application mount
       try {
+        localStorage.setItem('needsDBClear', 'true');
         localStorage.removeItem('skippedAuth');
-        // Fallback: manually delete any supabase session keys from localStorage
+        
+        // Manually delete any supabase session keys from localStorage
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
@@ -102,23 +108,13 @@ export function AuthModal({ isOpen, onClose }) {
             keysToRemove.push(key);
           }
         }
-        keysToRemove.forEach(key => {
-          localStorage.removeItem(key);
-          console.log('[Auth] Removed localStorage key:', key);
-        });
+        keysToRemove.forEach(key => localStorage.removeItem(key));
         console.log('[Auth] Local storage cleared');
       } catch (error) {
         console.warn('[Auth] Local storage cleanup error:', error);
       }
-
-      try {
-        await clearLocalDatabase();
-        console.log('[Auth] Local database cleared');
-      } catch (error) {
-        console.warn('[Auth] Database clear error:', error);
-      }
       
-      console.log('[Auth] Sign out complete, reloading page...');
+      console.log('[Auth] Session invalidated. Triggering reload for database purge...');
       window.location.reload();
     } catch (globalError) {
       console.error('[Auth] Global sign out handler crash:', globalError);
@@ -138,8 +134,9 @@ export function AuthModal({ isOpen, onClose }) {
       <div className="bg-background-secondary rounded-none shadow-2xl border border-foreground-tertiary/20 p-8 max-w-md w-full relative">
         {/* Close Button */}
         <button 
+          type="button"
           onClick={onClose}
-          className="absolute right-6 top-6 rounded-none p-1.5 hover:bg-background text-foreground-secondary hover:text-foreground transition duration-200"
+          className="absolute right-6 top-6 rounded-none p-1.5 hover:bg-background text-foreground-secondary hover:text-foreground transition duration-200 cursor-pointer"
           aria-label="Close modal"
         >
           <X size={16} weight="thin" />
@@ -166,14 +163,16 @@ export function AuthModal({ isOpen, onClose }) {
 
             <div className="space-y-3 pt-4 border-t border-foreground-tertiary/10">
               <button
+                type="button"
                 onClick={onClose}
-                className="w-full px-6 py-3.5 bg-indigo text-background text-sm font-sans font-medium hover:bg-clay transition duration-300 rounded-none shadow-md"
+                className="w-full px-6 py-3.5 bg-indigo text-background text-sm font-sans font-medium hover:bg-clay transition duration-300 rounded-none shadow-md cursor-pointer"
               >
                 Continue Reading
               </button>
               <button
+                type="button"
                 onClick={handleSignOut}
-                className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 border border-vermillion/25 text-vermillion text-sm font-sans font-medium hover:bg-vermillion hover:text-background transition duration-300 rounded-none"
+                className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 border border-vermillion/25 text-vermillion text-sm font-sans font-medium hover:bg-vermillion hover:text-background transition duration-300 rounded-none cursor-pointer"
               >
                 <SignOut size={16} weight="thin" />
                 Sign Out

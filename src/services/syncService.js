@@ -51,8 +51,9 @@ export async function syncLocalToCloud() {
   await syncDeletionsToCloud();
 
   try {
-    // Sync unsynced books
-    const localBooks = await db.books.where('synced').equals(0).toArray();
+    // Sync unsynced books (where synced is not 1, catching 0, undefined, or legacy records)
+    const allLocalBooks = await db.books.toArray();
+    const localBooks = allLocalBooks.filter(book => book.synced !== 1);
     
     for (const book of localBooks) {
       try {
@@ -84,7 +85,8 @@ export async function syncLocalToCloud() {
     }
 
     // Sync unsynced quotes
-    const localQuotes = await db.quotes.where('synced').equals(0).toArray();
+    const allLocalQuotes = await db.quotes.toArray();
+    const localQuotes = allLocalQuotes.filter(quote => quote.synced !== 1);
     
     for (const quote of localQuotes) {
       try {
@@ -110,7 +112,8 @@ export async function syncLocalToCloud() {
     }
 
     // Sync progress
-    const localProgress = await db.ebookProgress.where('synced').equals(0).toArray();
+    const allLocalProgress = await db.ebookProgress.toArray();
+    const localProgress = allLocalProgress.filter(progress => progress.synced !== 1);
     
     for (const progress of localProgress) {
       try {
