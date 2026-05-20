@@ -129,4 +129,11 @@ export async function deleteQuote(id) {
   await db.deletedRecords.put({ id, type: 'quote' });
 }
 
+export async function clearLocalDatabase() {
+  await db.books.clear();
+  await db.quotes.clear();
+  await db.ebookProgress.clear();
+  await db.deletedRecords.clear();
+}
+
 

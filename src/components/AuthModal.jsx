@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { clearLocalDatabase } from '../services/db';
 import { X, CloudArrowUp, SignOut, EnvelopeSimple, Lock } from '@phosphor-icons/react';
 
 export function AuthModal({ isOpen, onClose }) {
@@ -84,6 +85,7 @@ export function AuthModal({ isOpen, onClose }) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('skippedAuth');
+    await clearLocalDatabase();
     window.location.reload(); // Refresh to clear local state
   };
 
