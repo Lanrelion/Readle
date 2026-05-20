@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { supabase } from './supabase';
 
 export const db = new Dexie('BookTrackDB');
 
@@ -23,10 +24,22 @@ db.version(3).stores({
 });
 
 export const seedMockData = async () => {
-  const count = await db.books.count();
-  if (count > 0) return;
+  if (localStorage.getItem('mockDataSeeded') === 'true') return;
 
-  await db.books.bulkAdd([
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    localStorage.setItem('mockDataSeeded', 'true');
+    return;
+  }
+
+  const count = await db.books.count();
+  if (count > 0) {
+    localStorage.setItem('mockDataSeeded', 'true');
+    return;
+  }
+
+  try {
+    await db.books.bulkAdd([
     {
       id: crypto.randomUUID(),
       type: 'ebook',
@@ -71,6 +84,10 @@ export const seedMockData = async () => {
       synced: 0
     }
   ]);
+  localStorage.setItem('mockDataSeeded', 'true');
+} catch (error) {
+  console.warn('[DB] Failed to seed mock data:', error);
+}
 };
 
 // Add helper to save PDF progress
