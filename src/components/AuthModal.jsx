@@ -83,9 +83,19 @@ export function AuthModal({ isOpen, onClose }) {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('skippedAuth');
-    await clearLocalDatabase();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn('[Auth] Supabase signOut error:', error);
+    }
+    
+    try {
+      localStorage.removeItem('skippedAuth');
+      await clearLocalDatabase();
+    } catch (error) {
+      console.warn('[Auth] Database clear error:', error);
+    }
+    
     window.location.reload(); // Refresh to clear local state
   };
 
