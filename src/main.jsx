@@ -9,16 +9,16 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-// Register Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        console.log('[App] Service Worker registered:', registration);
-      })
-      .catch((error) => {
-        console.error('[App] Service Worker registration failed:', error);
-      });
-  });
-}
+import { registerSW } from 'virtual:pwa-register'
+
+// Register the PWA Service Worker (this handles dynamic caching properly)
+const updateSW = registerSW({
+  onNeedRefresh() {
+    if (confirm('New content available. Reload?')) {
+      updateSW(true)
+    }
+  },
+  onOfflineReady() {
+    console.log('[App] App is ready to work offline.')
+  },
+})

@@ -90,7 +90,17 @@ function App() {
       }
     }, 5 * 60 * 1000); // 5 minutes
 
-    return () => clearInterval(interval);
+    // Instant sync upon reconnection
+    const handleOnline = () => {
+      console.log('[App] Internet connection restored, starting immediate sync...');
+      fullSync().catch(err => console.warn('[App] Reconnection sync failed:', err));
+    };
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+    };
   }, [user, isPurging]);
 
   if (isPurging) {

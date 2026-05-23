@@ -162,6 +162,12 @@ export async function syncCloudToLocal() {
   let failed = 0;
 
   try {
+    // Load local tombstones to prevent resurrecting deleted items
+    const deletedRecords = await db.deletedRecords.toArray();
+    const deletedBookIds = new Set(deletedRecords.filter(r => r.type === 'book').map(r => r.id));
+    const deletedQuoteIds = new Set(deletedRecords.filter(r => r.type === 'quote').map(r => r.id));
+    const deletedProgressIds = new Set(deletedRecords.filter(r => r.type === 'progress').map(r => r.id));
+
     // Pull books
     const { data: cloudBooks, error: booksError } = await supabase
       .from('books')
@@ -189,11 +195,14 @@ export async function syncCloudToLocal() {
 
     for (const book of cloudBooks || []) {
       try {
+        if (deletedBookIds.has(book.id)) continue;
+
         const local = await db.books.get(book.id);
         const cloudNewer = local ? (new Date(book.updated_at) > new Date(local.updatedAt || local.dateAdded || 0)) : true;
         
-        // If local doesn't exist, is already in sync, or cloud is newer: apply cloud changes
-        if (!local || local.synced === 1 || cloudNewer) {
+        // Only overwrite local if it's perfectly in sync. If there are pending offline edits (synced !== 1),
+        // we preserve local and let syncLocalToCloud push the offline edits up to the cloud.
+        if (!local || (local.synced === 1 && cloudNewer)) {
           await db.books.put({
             id: book.id,
             type: book.type,
@@ -239,6 +248,8 @@ export async function syncCloudToLocal() {
 
     for (const quote of cloudQuotes || []) {
       try {
+        if (deletedQuoteIds.has(quote.id)) continue;
+
         const local = await db.quotes.get(quote.id);
         if (!local || local.synced === 1) {
           await db.quotes.put({
@@ -280,10 +291,12 @@ export async function syncCloudToLocal() {
     for (const progress of cloudProgress || []) {
       try {
         const progressId = `${progress.book_id}-progress`;
+        if (deletedProgressIds.has(progressId)) continue;
+
         const local = await db.ebookProgress.get(progressId);
         const cloudNewer = local ? (new Date(progress.last_read_date) > new Date(local.lastReadDate || 0)) : true;
 
-        if (!local || local.synced === 1 || cloudNewer) {
+        if (!local || (local.synced === 1 && cloudNewer)) {
           await db.ebookProgress.put({
             id: progressId,
             bookId: progress.book_id,
@@ -316,11 +329,11 @@ export async function syncCloudToLocal() {
 export async function fullSync() {
   console.log('[Sync] Starting full sync...');
   
-  // First pull from cloud (to get latest from other devices)
-  const downloadResult = await syncCloudToLocal();
-  
-  // Then push local changes (to save local edits)
+  // First push local changes (Local-to-Cloud priority for offline edits)
   const uploadResult = await syncLocalToCloud();
+
+  // Then pull from cloud to get updates from other devices
+  const downloadResult = await syncCloudToLocal();
   
   return {
     downloaded: downloadResult.downloaded,
