@@ -17,12 +17,15 @@ export function PDFReader({ bookId, fileBlob, onProgressUpdate }) {
     onProgressUpdateRef.current = onProgressUpdate;
   }, [onProgressUpdate]);
 
+  const loadedBookIdRef = useRef(null);
+
   // Load PDF on mount (safely dependent on stable bookId)
   useEffect(() => {
     let mounted = true;
 
     async function loadPDFFile() {
-      if (!fileBlob) return;
+      if (!fileBlob || loadedBookIdRef.current === bookId) return;
+      
       try {
         setLoading(true);
         const pdfDoc = await loadPDF(fileBlob);
@@ -31,10 +34,11 @@ export function PDFReader({ bookId, fileBlob, onProgressUpdate }) {
           setPdf(pdfDoc);
           setNumPages(pdfDoc.numPages);
           setLoading(false);
+          loadedBookIdRef.current = bookId; // Prevent reloading if fileBlob reference changes
         }
       } catch (error) {
         console.error('[PDFReader] Failed to load PDF:', error);
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 

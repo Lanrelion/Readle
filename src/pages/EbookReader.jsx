@@ -249,8 +249,8 @@ export default function EbookReader() {
       const updateData = {
         status: currentPage === totalPages ? 'completed' : 'reading',
         progress: {
-          type: 'percentage',
-          value: percentage,
+          type: 'pages',
+          value: `${currentPage}/${totalPages}`,
           currentPage,
           totalPages
         },

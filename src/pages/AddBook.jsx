@@ -48,18 +48,47 @@ export default function AddBook() {
 
     setIsScanning(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64Image = event.target.result;
-        setFormData(prev => ({ ...prev, cover: base64Image }));
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      
+      img.onload = async () => {
+        URL.revokeObjectURL(objectUrl);
+        
+        // Compress image using canvas
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Get compressed base64 JPEG
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+        setFormData(prev => ({ ...prev, cover: compressedBase64 }));
 
         try {
-          const result = await Tesseract.recognize(file, 'eng');
+          const result = await Tesseract.recognize(canvas, 'eng');
           const text = result.data.text;
           
           const lines = text.split('\n')
             .map(l => l.trim())
-            .filter(l => l.length > 3);
+            .filter(l => l.length > 2); // Ignore tiny artifacts
             
           if (lines.length > 0) {
             setFormData(prev => ({
@@ -73,7 +102,13 @@ export default function AddBook() {
         }
         setIsScanning(false);
       };
-      reader.readAsDataURL(file);
+      
+      img.onerror = () => {
+        alert("Failed to read image file.");
+        setIsScanning(false);
+      };
+      
+      img.src = objectUrl;
     } catch (error) {
       console.error(error);
       alert("Failed to process cover image.");
@@ -162,8 +197,8 @@ export default function AddBook() {
         dateCompleted: formData.status === 'completed' ? new Date().toISOString() : null,
         metadata: { totalPages: parseInt(formData.totalPages) || null },
         progress: formData.status === 'completed'
-          ? { type: 'pages', value: `${formData.totalPages}/${formData.totalPages}` }
-          : { type: 'percentage', value: 0 },
+          ? { type: 'pages', value: `${formData.totalPages || '?'}/${formData.totalPages || '?'}` }
+          : { type: 'pages', value: `0/${formData.totalPages || '?'}` },
         fileBlob: fileBlob,
         updatedAt: new Date().toISOString(),
         synced: 0
