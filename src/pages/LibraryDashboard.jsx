@@ -179,12 +179,14 @@ export default function LibraryDashboard() {
             <span className="text-xs font-accent uppercase tracking-widest text-foreground-tertiary">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="px-4 py-2 bg-indigo hover:bg-clay text-background text-xs font-sans font-medium uppercase tracking-wider transition duration-300 rounded-none shadow-sm cursor-pointer"
-            >
-              {user ? 'Account' : 'Sign In to Sync'}
-            </button>
+              {(!user && localStorage.getItem('skippedAuth') === 'true') ? null : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-4 py-2 bg-indigo hover:bg-clay text-background text-xs font-sans font-medium uppercase tracking-wider transition duration-300 rounded-none shadow-sm cursor-pointer"
+                >
+                  {user ? 'Account' : 'Sign In to Sync'}
+                </button>
+              )}
           </div>
           
           <h1 className="text-5xl font-serif font-normal text-foreground leading-tight">

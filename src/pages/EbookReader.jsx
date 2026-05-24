@@ -93,8 +93,9 @@ export default function EbookReader() {
           };
         }
 
-        db.books.update(id, updateData);
-        syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
+        db.books.update(id, updateData).then(() => {
+          syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
+        });
       };
 
       const savedCfi = bookData.progress?.cfi || (bookData.progress?.type === 'cfi' ? bookData.progress.value : undefined);

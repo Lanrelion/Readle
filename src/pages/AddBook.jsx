@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, UploadSimple, Camera } from '@phosphor-icons/react';
+import { CheckCircle, UploadSimple, Camera, Barcode } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
-import Tesseract from 'tesseract.js';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
 import { loadPDF, getPDFMetadata } from '../services/pdfService';
+import { ISBNScannerModal } from '../components/ISBNScannerModal';
 import { fullSync } from '../services/syncService';
 
 export default function AddBook() {
@@ -15,6 +15,7 @@ export default function AddBook() {
   const [fileBlob, setFileBlob] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -82,24 +83,6 @@ export default function AddBook() {
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
         setFormData(prev => ({ ...prev, cover: compressedBase64 }));
 
-        try {
-          const result = await Tesseract.recognize(canvas, 'eng');
-          const text = result.data.text;
-          
-          const lines = text.split('\n')
-            .map(l => l.trim())
-            .filter(l => l.length > 2); // Ignore tiny artifacts
-            
-          if (lines.length > 0) {
-            setFormData(prev => ({
-              ...prev,
-              title: prev.title || lines[0],
-              author: prev.author || (lines.length > 1 ? lines[1] : prev.author)
-            }));
-          }
-        } catch (ocrErr) {
-          console.error("OCR failed", ocrErr);
-        }
         setIsScanning(false);
       };
       
@@ -114,6 +97,33 @@ export default function AddBook() {
       alert("Failed to process cover image.");
       setIsScanning(false);
     }
+  };
+
+  const handleBarcodeScan = async (isbn) => {
+    setIsScannerOpen(false);
+    setIsScanning(true);
+    setFormData(prev => ({ ...prev, isbn }));
+
+    try {
+      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+      const data = await res.json();
+      const bookData = data[`ISBN:${isbn}`];
+      if (bookData) {
+        setFormData(prev => ({
+          ...prev,
+          title: bookData.title || prev.title,
+          author: bookData.authors?.[0]?.name || prev.author,
+          totalPages: bookData.number_of_pages || prev.totalPages,
+          cover: bookData.cover?.large || bookData.cover?.medium || prev.cover
+        }));
+      } else {
+        alert("Barcode scanned successfully, but no matching book was found in the OpenLibrary database.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to fetch book data from OpenLibrary.");
+    }
+    setIsScanning(false);
   };
 
   const handleChange = (e) => {
@@ -304,21 +314,36 @@ export default function AddBook() {
                 </div>
               ) : (
                 <>
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center bg-indigo/5 text-indigo rounded-none">
-                    <Camera size={26} weight="thin" />
+                  <div className="mx-auto flex gap-4 items-center justify-center">
+                    <div className="flex h-14 w-14 items-center justify-center bg-indigo/5 text-indigo rounded-none">
+                      <Camera size={26} weight="thin" />
+                    </div>
+                    <div className="flex h-14 w-14 items-center justify-center bg-moss/5 text-moss rounded-none">
+                      <Barcode size={26} weight="thin" />
+                    </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-serif font-normal text-foreground">Snap a companion's cover</p>
-                    <p className="text-xs text-foreground-tertiary font-sans max-w-xs">We will attempt to OCR auto-extract titles and creators.</p>
+                    <p className="text-sm font-serif font-normal text-foreground">Scan Cover or Barcode</p>
+                    <p className="text-xs text-foreground-tertiary font-sans max-w-xs">Scan the back barcode to auto-fill book details, or snap the cover directly.</p>
                   </div>
-                  <button 
-                    type="button"
-                    disabled={isScanning}
-                    onClick={() => coverInputRef.current?.click()}
-                    className="inline-flex items-center justify-center rounded-none border border-foreground-tertiary/30 bg-transparent px-5 py-2.5 text-xs font-sans font-medium text-foreground hover:bg-background transition duration-300 disabled:opacity-50"
-                  >
-                    {isScanning ? "Analyzing..." : "Scan Cover"}
-                  </button>
+                  <div className="flex justify-center gap-3 w-full">
+                    <button 
+                      type="button"
+                      disabled={isScanning}
+                      onClick={() => coverInputRef.current?.click()}
+                      className="inline-flex items-center justify-center rounded-none border border-foreground-tertiary/30 bg-transparent px-4 py-2.5 text-xs font-sans font-medium text-foreground hover:bg-background transition duration-300 disabled:opacity-50"
+                    >
+                      {isScanning ? "Processing..." : "Take Photo"}
+                    </button>
+                    <button 
+                      type="button"
+                      disabled={isScanning}
+                      onClick={() => setIsScannerOpen(true)}
+                      className="inline-flex items-center justify-center rounded-none border border-indigo/30 bg-indigo/5 px-4 py-2.5 text-xs font-sans font-medium text-indigo hover:bg-indigo hover:text-background transition duration-300 disabled:opacity-50"
+                    >
+                      Scan Barcode
+                    </button>
+                  </div>
                 </>
               )}
               <input type="file" accept="image/*" capture="environment" ref={coverInputRef} className="hidden" onChange={handleScanCover} />
@@ -350,9 +375,9 @@ export default function AddBook() {
                 />
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="mb-2 block text-xs font-accent uppercase tracking-widest text-foreground-tertiary">ISBN <span className="opacity-60">(Optional)</span></label>
+                  <label className="mb-2 block text-xs font-accent uppercase tracking-widest text-foreground-tertiary">ISBN (Optional)</label>
                   <input 
                     type="text" 
                     name="isbn" 
@@ -361,17 +386,19 @@ export default function AddBook() {
                     className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo" 
                   />
                 </div>
-                <div>
-                  <label className="mb-2 block text-xs font-accent uppercase tracking-widest text-foreground-tertiary">Total Pages</label>
-                  <input 
-                    type="number" 
-                    name="totalPages" 
-                    value={formData.totalPages} 
-                    onChange={handleChange} 
-                    min="1" 
-                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo" 
-                  />
-                </div>
+                {!fileBlob && (
+                  <div>
+                    <label className="mb-2 block text-xs font-accent uppercase tracking-widest text-foreground-tertiary">Total Pages</label>
+                    <input 
+                      type="number" 
+                      name="totalPages" 
+                      value={formData.totalPages} 
+                      onChange={handleChange} 
+                      min="1" 
+                      className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo" 
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -418,6 +445,11 @@ export default function AddBook() {
           </form>
         )}
       </main>
+      <ISBNScannerModal 
+        isOpen={isScannerOpen} 
+        onClose={() => setIsScannerOpen(false)} 
+        onScan={handleBarcodeScan} 
+      />
     </div>
   );
 }

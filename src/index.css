@@ -82,7 +82,6 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     font-feature-settings: "rlig" 1, "calt" 1;
-    overflow-x: hidden;
   }
 
   img, svg, video, canvas, audio, iframe, embed, object {
