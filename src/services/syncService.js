@@ -52,8 +52,7 @@ export async function syncLocalToCloud() {
 
   try {
     // Sync unsynced books (where synced is not 1, catching 0, undefined, or legacy records)
-    const allLocalBooks = await db.books.toArray();
-    const localBooks = allLocalBooks.filter(book => book.synced !== 1);
+    const localBooks = await db.books.filter(book => book.synced !== 1).toArray();
     
     for (const book of localBooks) {
       try {
@@ -85,8 +84,7 @@ export async function syncLocalToCloud() {
     }
 
     // Sync unsynced quotes
-    const allLocalQuotes = await db.quotes.toArray();
-    const localQuotes = allLocalQuotes.filter(quote => quote.synced !== 1);
+    const localQuotes = await db.quotes.filter(quote => quote.synced !== 1).toArray();
     
     for (const quote of localQuotes) {
       try {
@@ -112,8 +110,7 @@ export async function syncLocalToCloud() {
     }
 
     // Sync progress
-    const allLocalProgress = await db.ebookProgress.toArray();
-    const localProgress = allLocalProgress.filter(progress => progress.synced !== 1);
+    const localProgress = await db.ebookProgress.filter(progress => progress.synced !== 1).toArray();
     
     for (const progress of localProgress) {
       try {
@@ -178,17 +175,17 @@ export async function syncCloudToLocal() {
 
     // Delete local books that were deleted on other devices
     const cloudBookIds = new Set(cloudBooks?.map(b => b.id) || []);
-    const localBooks = await db.books.toArray();
-    for (const localBook of localBooks) {
-      if (localBook.synced === 1 && !cloudBookIds.has(localBook.id)) {
-        console.log('[Sync] Deleting book locally (deleted on other device):', localBook.title);
-        await db.books.delete(localBook.id);
-        await db.ebookProgress.delete(`${localBook.id}-progress`);
+    const localSyncedBookIds = await db.books.filter(b => b.synced === 1).primaryKeys();
+    for (const localId of localSyncedBookIds) {
+      if (!cloudBookIds.has(localId)) {
+        console.log('[Sync] Deleting book locally (deleted on other device):', localId);
+        await db.books.delete(localId);
+        await db.ebookProgress.delete(`${localId}-progress`);
         
         // Also delete associated local quotes
-        const bookQuotes = await db.quotes.where('bookId').equals(localBook.id).toArray();
-        for (const q of bookQuotes) {
-          await db.quotes.delete(q.id);
+        const bookQuoteIds = await db.quotes.where('bookId').equals(localId).primaryKeys();
+        for (const qId of bookQuoteIds) {
+          await db.quotes.delete(qId);
         }
       }
     }
@@ -238,11 +235,11 @@ export async function syncCloudToLocal() {
 
     // Delete local quotes that were deleted on other devices
     const cloudQuoteIds = new Set(cloudQuotes?.map(q => q.id) || []);
-    const localQuotes = await db.quotes.toArray();
-    for (const localQuote of localQuotes) {
-      if (localQuote.synced === 1 && !cloudQuoteIds.has(localQuote.id)) {
-        console.log('[Sync] Deleting quote locally (deleted on other device):', localQuote.id);
-        await db.quotes.delete(localQuote.id);
+    const localSyncedQuoteIds = await db.quotes.filter(q => q.synced === 1).primaryKeys();
+    for (const localQuoteId of localSyncedQuoteIds) {
+      if (!cloudQuoteIds.has(localQuoteId)) {
+        console.log('[Sync] Deleting quote locally (deleted on other device):', localQuoteId);
+        await db.quotes.delete(localQuoteId);
       }
     }
 
@@ -280,11 +277,11 @@ export async function syncCloudToLocal() {
 
     // Delete local progresses that were deleted on other devices
     const cloudProgressIds = new Set(cloudProgress?.map(p => `${p.book_id}-progress`) || []);
-    const localProgresses = await db.ebookProgress.toArray();
-    for (const localProgress of localProgresses) {
-      if (localProgress.synced === 1 && !cloudProgressIds.has(localProgress.id)) {
-        console.log('[Sync] Deleting progress locally (deleted on other device):', localProgress.id);
-        await db.ebookProgress.delete(localProgress.id);
+    const localSyncedProgressIds = await db.ebookProgress.filter(p => p.synced === 1).primaryKeys();
+    for (const localProgressId of localSyncedProgressIds) {
+      if (!cloudProgressIds.has(localProgressId)) {
+        console.log('[Sync] Deleting progress locally (deleted on other device):', localProgressId);
+        await db.ebookProgress.delete(localProgressId);
       }
     }
 
