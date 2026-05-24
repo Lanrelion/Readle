@@ -314,32 +314,19 @@ export default function AddBook() {
                 </div>
               ) : (
                 <>
-                  <div className="mx-auto flex gap-4 items-center justify-center">
-                    <div className="flex h-14 w-14 items-center justify-center bg-indigo/5 text-indigo rounded-none">
-                      <Camera size={26} weight="thin" />
-                    </div>
-                    <div className="flex h-14 w-14 items-center justify-center bg-moss/5 text-moss rounded-none">
-                      <Barcode size={26} weight="thin" />
-                    </div>
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center bg-moss/5 text-moss rounded-none">
+                    <Barcode size={26} weight="thin" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-serif font-normal text-foreground">Scan Cover or Barcode</p>
-                    <p className="text-xs text-foreground-tertiary font-sans max-w-xs">Scan the back barcode to auto-fill book details, or snap the cover directly.</p>
+                    <p className="text-sm font-serif font-normal text-foreground">Scan Barcode</p>
+                    <p className="text-xs text-foreground-tertiary font-sans max-w-xs">Scan the back barcode to auto-fill book details.</p>
                   </div>
                   <div className="flex justify-center gap-3 w-full">
                     <button 
                       type="button"
                       disabled={isScanning}
-                      onClick={() => coverInputRef.current?.click()}
-                      className="inline-flex items-center justify-center rounded-none border border-foreground-tertiary/30 bg-transparent px-4 py-2.5 text-xs font-sans font-medium text-foreground hover:bg-background transition duration-300 disabled:opacity-50"
-                    >
-                      {isScanning ? "Processing..." : "Take Photo"}
-                    </button>
-                    <button 
-                      type="button"
-                      disabled={isScanning}
                       onClick={() => setIsScannerOpen(true)}
-                      className="inline-flex items-center justify-center rounded-none border border-indigo/30 bg-indigo/5 px-4 py-2.5 text-xs font-sans font-medium text-indigo hover:bg-indigo hover:text-background transition duration-300 disabled:opacity-50"
+                      className="inline-flex items-center justify-center rounded-none border border-indigo/30 bg-indigo/5 px-6 py-2.5 text-xs font-sans font-medium text-indigo hover:bg-indigo hover:text-background transition duration-300 disabled:opacity-50"
                     >
                       Scan Barcode
                     </button>

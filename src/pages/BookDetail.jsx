@@ -99,13 +99,16 @@ export default function BookDetail() {
   };
 
   const handleMarkCompleted = async () => {
+    const hasTotalPages = !!book.metadata?.totalPages;
+    const currentProgressType = book.progress?.type || (hasTotalPages ? 'pages' : 'percentage');
+    
     await db.books.update(id, {
       status: 'completed',
       dateCompleted: new Date().toISOString(),
       progress: { 
         ...book.progress,
-        type: book.progress?.type || 'pages', 
-        value: book.progress?.type === 'percentage' ? 100 : `${book.metadata?.totalPages || '?'}/${book.metadata?.totalPages || '?'}` 
+        type: currentProgressType, 
+        value: currentProgressType === 'percentage' ? 100 : `${book.metadata?.totalPages || '?'}/${book.metadata?.totalPages || '?'}` 
       },
       updatedAt: new Date().toISOString(),
       synced: 0
@@ -114,15 +117,18 @@ export default function BookDetail() {
   };
 
   const handleUpdateProgress = async () => {
-    const isPercent = book.progress?.type === 'percentage';
+    const hasTotalPages = !!book.metadata?.totalPages;
+    const currentProgressType = book.progress?.type || (hasTotalPages ? 'pages' : 'percentage');
+    const isPercent = currentProgressType === 'percentage';
+
     const formattedVal = isPercent
       ? Math.min(100, Math.max(0, parseInt(newProgress) || 0))
-      : `${newProgress}/${book.metadata?.totalPages || '?'}`;
+      : `${newProgress}/${book.metadata?.totalPages}`;
 
     await db.books.update(id, {
       progress: { 
         ...book.progress, 
-        type: book.progress?.type || 'pages', 
+        type: currentProgressType, 
         value: formattedVal 
       },
       status: 'reading', // Auto-update status if updating progress
@@ -283,11 +289,11 @@ export default function BookDetail() {
                       type="number" 
                       value={newProgress}
                       onChange={(e) => setNewProgress(e.target.value)}
-                      placeholder={book.progress?.type === 'percentage' ? '%' : 'Page #'}
+                      placeholder={(book.progress?.type === 'percentage' || (!book.progress?.type && !book.metadata?.totalPages)) ? '%' : 'Page #'}
                       className="w-24 rounded-none border border-foreground-tertiary/30 bg-background px-4 py-2.5 text-sm font-sans outline-none focus:border-indigo" 
                     />
                     <span className="text-sm text-foreground-secondary font-sans">
-                      {book.progress?.type === 'percentage' ? '% Read' : `/ ${book.metadata?.totalPages || '?'}`}
+                      {(book.progress?.type === 'percentage' || (!book.progress?.type && !book.metadata?.totalPages)) ? '% Read' : `/ ${book.metadata?.totalPages || '?'}`}
                     </span>
                     <button 
                       onClick={handleUpdateProgress}
