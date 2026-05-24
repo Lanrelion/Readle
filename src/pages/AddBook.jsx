@@ -215,7 +215,7 @@ export default function AddBook() {
       };
       
       await db.books.add(newBook);
-      fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
+      await fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
       navigate('/');
     } catch (err) {
       alert("Error saving book: " + err.message);
