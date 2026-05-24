@@ -126,7 +126,7 @@ function App() {
       />
       <Router>
         <Routes>
-          <Route path="/" element={<LibraryDashboard />} />
+          <Route path="/" element={<LibraryDashboard user={user} />} />
           <Route path="/add" element={<AddBook />} />
           <Route path="/book/:id" element={<BookDetail />} />
           <Route path="/read/:id" element={<EbookReader />} />

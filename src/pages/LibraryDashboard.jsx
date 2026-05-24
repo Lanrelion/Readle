@@ -8,28 +8,13 @@ import gsap from 'gsap';
 import { supabase } from '../services/supabase';
 import { AuthModal } from '../components/AuthModal';
 
-export default function LibraryDashboard() {
+export default function LibraryDashboard({ user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('statusFilter') || 'all');
   const [filterType, setFilterType] = useState(() => localStorage.getItem('formatFilter') || 'all');
   const [dateFilter, setDateFilter] = useState(() => localStorage.getItem('dateFilter') || 'all');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [user, setUser] = useState(null);
   const dashboardRef = useRef(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   // Seed mock data once on mount
   useEffect(() => {
