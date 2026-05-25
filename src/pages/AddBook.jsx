@@ -395,7 +395,7 @@ export default function AddBook() {
                     name="type" 
                     value={formData.type} 
                     onChange={handleChange} 
-                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer"
+                    className="w-full rounded-none border border-transparent bg-foreground/5 px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer"
                   >
                     <option value="physical">Physical Companion</option>
                     <option value="ebook">Ebook (EPUB)</option>
@@ -408,7 +408,7 @@ export default function AddBook() {
                     name="status" 
                     value={formData.status} 
                     onChange={handleChange} 
-                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo"
+                    className="w-full rounded-none border border-transparent bg-foreground/5 px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer"
                   >
                     <option value="wantToRead">Want to Read</option>
                     <option value="reading">Currently Reading</option>

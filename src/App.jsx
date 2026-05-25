@@ -8,6 +8,7 @@ import QuotesList from './pages/QuotesList';
 import { useTheme } from './hooks/useTheme';
 import { OfflineBanner } from './components/OfflineBanner';
 import { AuthModal } from './components/AuthModal';
+import ScrollToTop from './components/ScrollToTop';
 import { supabase } from './services/supabase';
 import { fullSync } from './services/syncService';
 import { clearLocalDatabase } from './services/db';
@@ -125,6 +126,7 @@ function App() {
         onClose={() => setShowAuthModal(false)}
       />
       <Router>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<LibraryDashboard user={user} />} />
           <Route path="/add" element={<AddBook />} />
