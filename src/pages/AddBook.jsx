@@ -395,7 +395,13 @@ export default function AddBook() {
                     name="type" 
                     value={formData.type} 
                     onChange={handleChange} 
-                    className="w-full rounded-none border border-transparent bg-foreground/5 px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer"
+                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background pl-4 pr-10 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238c857b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+                      backgroundPosition: 'right 12px center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '16px',
+                    }}
                   >
                     <option value="physical">Physical Companion</option>
                     <option value="ebook">Ebook (EPUB)</option>
@@ -408,7 +414,13 @@ export default function AddBook() {
                     name="status" 
                     value={formData.status} 
                     onChange={handleChange} 
-                    className="w-full rounded-none border border-transparent bg-foreground/5 px-4 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer"
+                    className="w-full rounded-none border border-foreground-tertiary/20 bg-background pl-4 pr-10 py-3 text-sm font-sans outline-none transition duration-200 focus:border-indigo cursor-pointer appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238c857b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+                      backgroundPosition: 'right 12px center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '16px',
+                    }}
                   >
                     <option value="wantToRead">Want to Read</option>
                     <option value="reading">Currently Reading</option>

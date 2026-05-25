@@ -242,7 +242,7 @@ export default function LibraryDashboard({ user }) {
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="h-9 pl-4 pr-10 py-0 text-xs font-sans font-medium uppercase tracking-wider bg-foreground/5 border border-transparent rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer appearance-none"
+              className="h-9 pl-4 pr-10 py-0 text-xs font-sans font-medium uppercase tracking-wider bg-background-secondary border border-foreground-tertiary/20 rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer appearance-none"
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238c857b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
                 backgroundPosition: 'right 12px center',
