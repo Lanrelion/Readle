@@ -23,6 +23,17 @@ db.version(3).stores({
   deletedRecords: 'id, type'
 });
 
+// [Bug 8] Request persistent storage to prevent browser from silently evicting IndexedDB
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(granted => {
+    if (granted) {
+      console.log('[DB] Persistent storage granted — data will not be auto-evicted');
+    } else {
+      console.warn('[DB] Persistent storage denied — data may be evicted under storage pressure');
+    }
+  });
+}
+
 export const seedMockData = async () => {
   if (localStorage.getItem('mockDataSeeded') === 'true') return;
 
@@ -146,11 +157,46 @@ export async function deleteQuote(id) {
   await db.deletedRecords.put({ id, type: 'quote' });
 }
 
+// [Bug 7] Rewritten to PRESERVE fileBlobs during sign-out.
+// Instead of wiping everything, we keep skeleton records with just id + fileBlob.
+// When the user signs back in, syncCloudToLocal will restore metadata on top of the skeletons.
 export async function clearLocalDatabase() {
-  await db.books.clear();
+  // Preserve fileBlobs: iterate all books, keep only id and fileBlob
+  const allBooks = await db.books.toArray();
+  for (const book of allBooks) {
+    if (book.fileBlob) {
+      // Keep skeleton with fileBlob intact — sync will restore metadata
+      await db.books.put({
+        id: book.id,
+        fileBlob: book.fileBlob,
+        // Mark as needing sync restore
+        _skeletonOnly: true,
+        synced: 1, // So syncCloudToLocal will overwrite metadata
+      });
+    } else {
+      // No file to preserve — safe to delete
+      await db.books.delete(book.id);
+    }
+  }
+  
   await db.quotes.clear();
   await db.ebookProgress.clear();
   await db.deletedRecords.clear();
 }
 
+// Helper to save progress for ANY book type (physical, ebook, pdf)
+export async function saveBookProgress(bookId, progressData) {
+  if (!bookId) return;
 
+  const { currentPage, totalPages, percentageRead } = progressData;
+
+  await db.ebookProgress.put({
+    id: `${bookId}-progress`,
+    bookId,
+    currentPage: currentPage ?? null,
+    totalPages: totalPages ?? null,
+    percentageRead: percentageRead ?? 0,
+    lastReadDate: new Date().toISOString(),
+    synced: 0,
+  });
+}

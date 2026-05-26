@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Trash, PencilSimple, CheckCircle, BookOpen } from '@phosphor-icons/react';
-import { db, deleteBook, deleteQuote } from '../services/db';
+import { db, deleteBook, deleteQuote, saveBookProgress } from '../services/db';
 import Navigation from '../components/Navigation';
 import { fullSync } from '../services/syncService';
 import gsap from 'gsap';
@@ -102,17 +102,28 @@ export default function BookDetail() {
     const hasTotalPages = !!book.metadata?.totalPages;
     const currentProgressType = book.progress?.type || (hasTotalPages ? 'pages' : 'percentage');
     
+    const completedValue = currentProgressType === 'percentage' ? 100 : `${book.metadata?.totalPages || '?'}/${book.metadata?.totalPages || '?'}`;
+    
     await db.books.update(id, {
       status: 'completed',
       dateCompleted: new Date().toISOString(),
       progress: { 
         ...book.progress,
         type: currentProgressType, 
-        value: currentProgressType === 'percentage' ? 100 : `${book.metadata?.totalPages || '?'}/${book.metadata?.totalPages || '?'}` 
+        value: completedValue
       },
       updatedAt: new Date().toISOString(),
       synced: 0
     });
+
+    // [Bug 13] Also write to ebookProgress table so it syncs to Supabase
+    const totalPages = book.metadata?.totalPages || null;
+    await saveBookProgress(id, {
+      currentPage: totalPages,
+      totalPages: totalPages,
+      percentageRead: 100,
+    });
+
     fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
   };
 
@@ -121,8 +132,9 @@ export default function BookDetail() {
     const currentProgressType = book.progress?.type || (hasTotalPages ? 'pages' : 'percentage');
     const isPercent = currentProgressType === 'percentage';
 
+    const numericProgress = parseInt(newProgress) || 0;
     const formattedVal = isPercent
-      ? Math.min(100, Math.max(0, parseInt(newProgress) || 0))
+      ? Math.min(100, Math.max(0, numericProgress))
       : `${newProgress}/${book.metadata?.totalPages}`;
 
     await db.books.update(id, {
@@ -131,10 +143,24 @@ export default function BookDetail() {
         type: currentProgressType, 
         value: formattedVal 
       },
-      status: 'reading', // Auto-update status if updating progress
+      status: 'reading',
       updatedAt: new Date().toISOString(),
       synced: 0
     });
+
+    // [Bug 13] Also write to ebookProgress table so it syncs to Supabase
+    const totalPages = book.metadata?.totalPages || null;
+    const currentPage = isPercent ? null : numericProgress;
+    const percentage = isPercent
+      ? numericProgress
+      : (totalPages ? Math.round((numericProgress / totalPages) * 100) : 0);
+
+    await saveBookProgress(id, {
+      currentPage: currentPage,
+      totalPages: totalPages,
+      percentageRead: percentage,
+    });
+
     fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
     setIsEditingProgress(false);
     setNewProgress('');

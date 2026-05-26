@@ -18,19 +18,9 @@ export function AuthModal({ isOpen, onClose }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
     });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
-        if (event === 'SIGNED_IN') {
-          onClose?.();
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [onClose]);
+    // [Bug 11] Removed duplicate onAuthStateChange listener.
+    // Auth state is managed centrally by App.jsx — no need to duplicate here.
+  }, []);
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();
@@ -99,6 +89,7 @@ export function AuthModal({ isOpen, onClose }) {
       try {
         localStorage.setItem('needsDBClear', 'true');
         localStorage.removeItem('skippedAuth');
+        localStorage.removeItem('cachedUser');
         
         // Manually delete any supabase session keys from localStorage
         const keysToRemove = [];

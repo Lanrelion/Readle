@@ -2,6 +2,10 @@
 import { supabase } from './supabase';
 import { db } from './db';
 
+// ── Sync Mutex ──────────────────────────────────────────────────────────────
+// Prevents concurrent fullSync() calls from racing against each other.
+let isSyncing = false;
+
 /**
  * Sync deletions to Supabase
  */
@@ -56,6 +60,10 @@ export async function syncLocalToCloud() {
     
     for (const book of localBooks) {
       try {
+        // [Bug 3] Strip base64 covers — they can be enormous and cause upsert timeouts.
+        // Cloud should only store URL covers; local IndexedDB retains the full cover.
+        const cloudCover = (book.cover && book.cover.startsWith('data:')) ? null : (book.cover || null);
+
         const bookData = {
           id: book.id,
           user_id: userId,
@@ -64,11 +72,13 @@ export async function syncLocalToCloud() {
           author: book.author,
           isbn: book.isbn || null,
           status: book.status,
-          cover: book.cover || null,
+          cover: cloudCover,
           progress: book.progress || null,
           date_added: book.dateAdded,
           date_completed: book.dateCompleted || null,
           metadata: book.metadata || null,
+          // [Bug 4] Include updated_at so cloud and local timestamps stay aligned
+          updated_at: book.updatedAt || new Date().toISOString(),
         };
 
         const { error } = await supabase.from('books').upsert(bookData);
@@ -93,9 +103,12 @@ export async function syncLocalToCloud() {
           user_id: userId,
           book_id: quote.bookId,
           quote_text: quote.text || quote.quoteText, // handle text/quoteText mapping
-          page_number: quote.pageNumber || null,
+          page_number: quote.pageNumber ?? null, // [Bug 6] nullish coalescing
           personal_note: quote.personalNote || null,
           date_saved: quote.dateSaved,
+          // [Bug 5] Include color and cfi fields for cross-device sync
+          color: quote.color || null,
+          cfi: quote.cfi || null,
         };
 
         const { error } = await supabase.from('quotes').upsert(quoteData);
@@ -117,11 +130,11 @@ export async function syncLocalToCloud() {
         const progressData = {
           user_id: userId,
           book_id: progress.bookId,
-          current_page: progress.currentPage || null,
-          total_pages: progress.totalPages || null,
-          percentage_read: progress.percentageRead || 0,
+          current_page: progress.currentPage ?? null,   // [Bug 6] nullish coalescing
+          total_pages: progress.totalPages ?? null,      // [Bug 6]
+          percentage_read: progress.percentageRead ?? 0, // [Bug 6]
           last_read_date: progress.lastReadDate,
-          total_read_time: progress.totalReadTime || 0,
+          total_read_time: progress.totalReadTime ?? 0,  // [Bug 6]
         };
 
         const { error } = await supabase.from('ebook_progress').upsert(progressData, { onConflict: 'user_id,book_id' });
@@ -197,10 +210,9 @@ export async function syncCloudToLocal() {
         const local = await db.books.get(book.id);
         const cloudNewer = local ? (new Date(book.updated_at) > new Date(local.updatedAt || local.dateAdded || 0)) : true;
         
-        // Only overwrite local if it's perfectly in sync. If there are pending offline edits (synced !== 1),
-        // we preserve local and let syncLocalToCloud push the offline edits up to the cloud.
-        if (!local || (local.synced === 1 && cloudNewer)) {
-          await db.books.put({
+        if (!local) {
+          // [Bug 1] New book from cloud — use add() since there's no local record
+          await db.books.add({
             id: book.id,
             type: book.type,
             title: book.title,
@@ -213,12 +225,32 @@ export async function syncCloudToLocal() {
             dateCompleted: book.date_completed,
             metadata: book.metadata,
             updatedAt: book.updated_at,
-            synced: 1, // mark as clean
-            // Preserve fileBlob if local book already has it
-            fileBlob: local?.fileBlob || null
+            synced: 1,
+            fileBlob: null // No file available from cloud
+          });
+          downloaded++;
+        } else if (local.synced === 1 && cloudNewer) {
+          // [Bug 1] Existing book — use update() to only modify metadata fields.
+          // This preserves fileBlob and any other local-only fields automatically.
+          await db.books.update(book.id, {
+            type: book.type,
+            title: book.title,
+            author: book.author,
+            isbn: book.isbn,
+            status: book.status,
+            // Only update cover from cloud if cloud has one, otherwise keep local
+            cover: book.cover || local.cover,
+            progress: book.progress,
+            dateAdded: book.date_added,
+            dateCompleted: book.date_completed,
+            metadata: book.metadata,
+            updatedAt: book.updated_at,
+            synced: 1,
+            // fileBlob is NOT touched — update() only modifies specified fields
           });
           downloaded++;
         }
+        // If local has pending offline edits (synced !== 1), skip — syncLocalToCloud will push them
       } catch (error) {
         console.error('[Sync] Failed to save book locally:', error);
         failed++;
@@ -248,8 +280,9 @@ export async function syncCloudToLocal() {
         if (deletedQuoteIds.has(quote.id)) continue;
 
         const local = await db.quotes.get(quote.id);
-        if (!local || local.synced === 1) {
-          await db.quotes.put({
+        if (!local) {
+          // New quote from cloud
+          await db.quotes.add({
             id: quote.id,
             bookId: quote.book_id,
             text: quote.quote_text,
@@ -257,6 +290,24 @@ export async function syncCloudToLocal() {
             pageNumber: quote.page_number,
             personalNote: quote.personal_note,
             dateSaved: quote.date_saved,
+            // [Bug 5] Restore color and cfi from cloud
+            color: quote.color || null,
+            cfi: quote.cfi || null,
+            synced: 1
+          });
+          downloaded++;
+        } else if (local.synced === 1) {
+          // Existing synced quote — update metadata
+          await db.quotes.update(quote.id, {
+            bookId: quote.book_id,
+            text: quote.quote_text,
+            quoteText: quote.quote_text,
+            pageNumber: quote.page_number,
+            personalNote: quote.personal_note,
+            dateSaved: quote.date_saved,
+            // [Bug 5] Restore color and cfi from cloud
+            color: quote.color || local.color || null,
+            cfi: quote.cfi || local.cfi || null,
             synced: 1
           });
           downloaded++;
@@ -293,9 +344,20 @@ export async function syncCloudToLocal() {
         const local = await db.ebookProgress.get(progressId);
         const cloudNewer = local ? (new Date(progress.last_read_date) > new Date(local.lastReadDate || 0)) : true;
 
-        if (!local || (local.synced === 1 && cloudNewer)) {
-          await db.ebookProgress.put({
+        if (!local) {
+          await db.ebookProgress.add({
             id: progressId,
+            bookId: progress.book_id,
+            currentPage: progress.current_page,
+            totalPages: progress.total_pages,
+            percentageRead: progress.percentage_read,
+            lastReadDate: progress.last_read_date,
+            totalReadTime: progress.total_read_time,
+            synced: 1
+          });
+          downloaded++;
+        } else if (local.synced === 1 && cloudNewer) {
+          await db.ebookProgress.update(progressId, {
             bookId: progress.book_id,
             currentPage: progress.current_page,
             totalPages: progress.total_pages,
@@ -321,20 +383,32 @@ export async function syncCloudToLocal() {
 }
 
 /**
- * Full bidirectional sync (Safe Pull-then-Push Sequence)
+ * Full bidirectional sync (Push-then-Pull Sequence)
+ * [Bug 2] Protected by a mutex to prevent concurrent sync operations.
  */
 export async function fullSync() {
+  // If already syncing, skip to avoid race conditions
+  if (isSyncing) {
+    console.log('[Sync] Sync already in progress, skipping...');
+    return { downloaded: 0, uploaded: 0, failed: 0 };
+  }
+
+  isSyncing = true;
   console.log('[Sync] Starting full sync...');
   
-  // First push local changes (Local-to-Cloud priority for offline edits)
-  const uploadResult = await syncLocalToCloud();
+  try {
+    // First push local changes (Local-to-Cloud priority for offline edits)
+    const uploadResult = await syncLocalToCloud();
 
-  // Then pull from cloud to get updates from other devices
-  const downloadResult = await syncCloudToLocal();
-  
-  return {
-    downloaded: downloadResult.downloaded,
-    uploaded: uploadResult.uploaded,
-    failed: downloadResult.failed + uploadResult.failed,
-  };
+    // Then pull from cloud to get updates from other devices
+    const downloadResult = await syncCloudToLocal();
+    
+    return {
+      downloaded: downloadResult.downloaded,
+      uploaded: uploadResult.uploaded,
+      failed: downloadResult.failed + uploadResult.failed,
+    };
+  } finally {
+    isSyncing = false;
+  }
 }

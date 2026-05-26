@@ -17,7 +17,13 @@ import './App.css';
 function App() {
   useTheme(); // Initialize theme globally
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [user, setUser] = useState(null);
+  // [Bug 10] Initialize user from localStorage cache to prevent "Sign In to Sync" flash
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cachedUser');
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
   const [isPurging, setIsPurging] = useState(() => localStorage.getItem('needsDBClear') === 'true');
 
   // Purge database on boot if needed (guarantees no locks from active React component trees)
@@ -44,7 +50,14 @@ function App() {
 
     // Check if user is signed in
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
+      const sessionUser = session?.user || null;
+      setUser(sessionUser);
+      // [Bug 10] Cache user in localStorage so next page load doesn't flash
+      if (sessionUser) {
+        localStorage.setItem('cachedUser', JSON.stringify({ id: sessionUser.id, email: sessionUser.email }));
+      } else {
+        localStorage.removeItem('cachedUser');
+      }
       
       const skipped = localStorage.getItem('skippedAuth') === 'true';
       
@@ -56,14 +69,21 @@ function App() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user || null);
+      (event, session) => {
+        const sessionUser = session?.user || null;
+        setUser(sessionUser);
         
+        // [Bug 10] Update cache on auth changes
+        if (sessionUser) {
+          localStorage.setItem('cachedUser', JSON.stringify({ id: sessionUser.id, email: sessionUser.email }));
+        } else {
+          localStorage.removeItem('cachedUser');
+        }
+
+        // [Bug 9] Removed fullSync() from here — the background sync useEffect
+        // below already triggers when `user` changes, preventing double sync.
         if (event === 'SIGNED_IN') {
-          console.log('[App] User signed in, starting sync...');
-          const result = await fullSync();
-          console.log('[App] Sync complete:', result);
-          alert(`Synced ${result.downloaded + result.uploaded} items`);
+          console.log('[App] User signed in — sync will trigger via background effect');
         }
       }
     );
@@ -80,8 +100,12 @@ function App() {
     // Only sync if user is signed in
     if (!user) return;
 
-    // Initial sync
-    fullSync();
+    // Initial sync (covers sign-in event too since user state changed)
+    fullSync().then(result => {
+      if (result.downloaded + result.uploaded > 0) {
+        console.log('[App] Initial sync complete:', result);
+      }
+    }).catch(err => console.warn('[App] Initial sync failed:', err));
 
     // Background sync every 5 minutes
     const interval = setInterval(() => {

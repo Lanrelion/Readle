@@ -28,6 +28,8 @@ create table quotes (
   quote_text text not null,
   page_number integer,
   personal_note text,
+  color text,
+  cfi text,
   date_saved timestamptz default now(),
   created_at timestamptz default now()
 );
@@ -105,6 +107,10 @@ create policy "Users can insert their own progress"
 
 create policy "Users can update their own progress"
   on ebook_progress for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete their own progress"
+  on ebook_progress for delete
   using (auth.uid() = user_id);
 
 -- Function to update updated_at timestamp
