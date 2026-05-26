@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { X, CloudArrowUp, SignOut, EnvelopeSimple, Lock } from '@phosphor-icons/react';
 
@@ -13,13 +13,28 @@ export function AuthModal({ isOpen, onClose }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Use a ref for onClose to avoid re-subscribing the listener on every render
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
     // Check current user session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
     });
-    // [Bug 11] Removed duplicate onAuthStateChange listener.
-    // Auth state is managed centrally by App.jsx — no need to duplicate here.
+
+    // Listen for auth state changes — only to auto-close modal on sign-in.
+    // Uses onCloseRef to avoid the dependency churn that caused Bug 11.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user || null);
+        if (event === 'SIGNED_IN') {
+          onCloseRef.current?.();
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleEmailAuth = async (e) => {
@@ -148,7 +163,7 @@ export function AuthModal({ isOpen, onClose }) {
                 Signed in as <span className="font-semibold text-foreground">{user.email}</span>
               </p>
               <p className="text-xs text-foreground-tertiary max-w-xs mx-auto leading-relaxed">
-                Your reading progress, book files, and collected thoughts are securely backing up to the cloud.
+                Your reading progress, book metadata, and collected quotes are securely syncing to the cloud. Book files remain on this device.
               </p>
             </div>
 

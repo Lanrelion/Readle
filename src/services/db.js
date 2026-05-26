@@ -161,20 +161,22 @@ export async function deleteQuote(id) {
 // Instead of wiping everything, we keep skeleton records with just id + fileBlob.
 // When the user signs back in, syncCloudToLocal will restore metadata on top of the skeletons.
 export async function clearLocalDatabase() {
-  // Preserve fileBlobs: iterate all books, keep only id and fileBlob
+  // Preserve fileBlobs and covers: iterate all books, keep only essential local-only data.
+  // When the user signs back in, syncCloudToLocal will restore metadata on top of the skeletons.
   const allBooks = await db.books.toArray();
   for (const book of allBooks) {
-    if (book.fileBlob) {
-      // Keep skeleton with fileBlob intact — sync will restore metadata
-      await db.books.put({
+    if (book.fileBlob || book.cover) {
+      // Keep skeleton with local-only data intact — sync will restore metadata
+      const skeleton = {
         id: book.id,
-        fileBlob: book.fileBlob,
-        // Mark as needing sync restore
         _skeletonOnly: true,
         synced: 1, // So syncCloudToLocal will overwrite metadata
-      });
+      };
+      if (book.fileBlob) skeleton.fileBlob = book.fileBlob;
+      if (book.cover) skeleton.cover = book.cover;
+      await db.books.put(skeleton);
     } else {
-      // No file to preserve — safe to delete
+      // No local-only data to preserve — safe to delete
       await db.books.delete(book.id);
     }
   }
