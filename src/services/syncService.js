@@ -1,6 +1,7 @@
 // src/services/syncService.js
 import { supabase } from './supabase';
 import { db } from './db';
+import { uploadBookFile, downloadBookFile, deleteBookFile } from './storageService';
 
 // ── Sync Mutex ──────────────────────────────────────────────────────────────
 // Prevents concurrent fullSync() calls from racing against each other.
@@ -17,6 +18,10 @@ export async function syncDeletionsToCloud() {
   for (const item of deletedList) {
     try {
       if (item.type === 'book') {
+        // Also attempt to delete the file from Storage. 
+        // We don't throw if this fails, because the file might already be gone.
+        await deleteBookFile(session.user.id, item.id);
+
         const { error } = await supabase.from('books').delete().eq('id', item.id);
         if (error) throw error;
       } else if (item.type === 'quote') {
@@ -64,6 +69,16 @@ export async function syncLocalToCloud() {
         // Cloud should only store URL covers; local IndexedDB retains the full cover.
         const cloudCover = (book.cover && book.cover.startsWith('data:')) ? null : (book.cover || null);
 
+        // Upload file to Supabase Storage if local fileBlob exists but no file_url is present
+        let fileUrl = book.file_url || null; // Might be undefined on older records
+        if (book.fileBlob && !fileUrl) {
+          console.log(`[Sync] Uploading file for book ${book.id}...`);
+          const uploadedUrl = await uploadBookFile(userId, book.id, book.fileBlob);
+          if (uploadedUrl) {
+            fileUrl = uploadedUrl;
+          }
+        }
+
         const bookData = {
           id: book.id,
           user_id: userId,
@@ -76,6 +91,7 @@ export async function syncLocalToCloud() {
           progress: book.progress || null,
           date_added: book.dateAdded,
           date_completed: book.dateCompleted || null,
+          file_url: fileUrl,
           metadata: book.metadata || null,
           // [Bug 4] Include updated_at so cloud and local timestamps stay aligned
           updated_at: book.updatedAt || new Date().toISOString(),
@@ -84,8 +100,8 @@ export async function syncLocalToCloud() {
         const { error } = await supabase.from('books').upsert(bookData);
         if (error) throw error;
         
-        // Mark as synced locally
-        await db.books.update(book.id, { synced: 1 });
+        // Mark as synced locally and update file_url
+        await db.books.update(book.id, { synced: 1, file_url: fileUrl });
         uploaded++;
       } catch (error) {
         console.error('[Sync] Failed to sync book:', book.title, error);
@@ -212,6 +228,13 @@ export async function syncCloudToLocal() {
         
         if (!local) {
           // [Bug 1] New book from cloud — use add() since there's no local record
+          
+          let downloadedBlob = null;
+          if (book.file_url) {
+            console.log(`[Sync] Downloading file for new book ${book.id}...`);
+            downloadedBlob = await downloadBookFile(userId, book.id);
+          }
+
           await db.books.add({
             id: book.id,
             type: book.type,
@@ -223,32 +246,46 @@ export async function syncCloudToLocal() {
             progress: book.progress,
             dateAdded: book.date_added,
             dateCompleted: book.date_completed,
+            file_url: book.file_url,
             metadata: book.metadata,
             updatedAt: book.updated_at,
             synced: 1,
-            fileBlob: null // No file available from cloud
+            fileBlob: downloadedBlob // Will be Blob or null
           });
           downloaded++;
-        } else if (local.synced === 1 && cloudNewer) {
-          // [Bug 1] Existing book — use update() to only modify metadata fields.
-          // This preserves fileBlob and any other local-only fields automatically.
-          await db.books.update(book.id, {
-            type: book.type,
-            title: book.title,
-            author: book.author,
-            isbn: book.isbn,
-            status: book.status,
-            // Only update cover from cloud if cloud has one, otherwise keep local
-            cover: book.cover || local.cover,
-            progress: book.progress,
-            dateAdded: book.date_added,
-            dateCompleted: book.date_completed,
-            metadata: book.metadata,
-            updatedAt: book.updated_at,
-            synced: 1,
-            // fileBlob is NOT touched — update() only modifies specified fields
-          });
-          downloaded++;
+        } else if (local.synced === 1) {
+          // Check if we need to download the file (it exists in cloud but not locally)
+          let downloadedBlob = local.fileBlob;
+          if (book.file_url && !local.fileBlob) {
+            console.log(`[Sync] Downloading missing file for existing book ${book.id}...`);
+            const fetchedBlob = await downloadBookFile(userId, book.id);
+            if (fetchedBlob) {
+              downloadedBlob = fetchedBlob;
+            }
+          }
+
+          if (cloudNewer || downloadedBlob !== local.fileBlob) {
+            // [Bug 1] Existing book — use update() to only modify metadata fields.
+            // This preserves fileBlob and any other local-only fields automatically.
+            await db.books.update(book.id, {
+              type: book.type,
+              title: book.title,
+              author: book.author,
+              isbn: book.isbn,
+              status: book.status,
+              // Only update cover from cloud if cloud has one, otherwise keep local
+              cover: book.cover || local.cover,
+              progress: book.progress,
+              dateAdded: book.date_added,
+              dateCompleted: book.date_completed,
+              file_url: book.file_url,
+              metadata: book.metadata,
+              updatedAt: book.updated_at,
+              synced: 1,
+              fileBlob: downloadedBlob
+            });
+            downloaded++;
+          }
         }
         // If local has pending offline edits (synced !== 1), skip — syncLocalToCloud will push them
       } catch (error) {
