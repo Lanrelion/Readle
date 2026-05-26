@@ -90,6 +90,10 @@ create policy "Users can delete their own quotes"
   on quotes for delete
   using (auth.uid() = user_id);
 
+create policy "Users can update their own quotes"
+  on quotes for update
+  using (auth.uid() = user_id);
+
 -- Progress policies
 create policy "Users can view their own progress"
   on ebook_progress for select

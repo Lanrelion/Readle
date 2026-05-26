@@ -94,7 +94,18 @@ export default function EbookReader() {
         }
 
         db.books.update(id, updateData).then(() => {
-          syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
+          // Also update the dedicated ebookProgress store for syncService
+          db.ebookProgress.put({
+            id: `${id}-progress`,
+            bookId: id,
+            currentPage: page,
+            totalPages: total,
+            percentageRead: percentage || 0,
+            lastReadDate: new Date().toISOString(),
+            synced: 0
+          }).then(() => {
+            syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
+          });
         });
       };
 
