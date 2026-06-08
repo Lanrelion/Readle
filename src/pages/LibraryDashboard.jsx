@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Books, MagnifyingGlass } from '@phosphor-icons/react';
-import { db, seedMockData } from '../services/db';
+import { db } from '../services/db';
 import BookCard from '../components/BookCard';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
@@ -15,11 +15,6 @@ export default function LibraryDashboard({ user }) {
   const [dateFilter, setDateFilter] = useState(() => localStorage.getItem('dateFilter') || 'all');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const dashboardRef = useRef(null);
-
-  // Seed mock data once on mount
-  useEffect(() => {
-    seedMockData();
-  }, []);
 
   // Entrance animation for dashboard elements
   useEffect(() => {

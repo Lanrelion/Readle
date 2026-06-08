@@ -7,7 +7,8 @@ import Navigation from '../components/Navigation';
 import gsap from 'gsap';
 import { loadPDF, getPDFMetadata } from '../services/pdfService';
 import { ISBNScannerModal } from '../components/ISBNScannerModal';
-import { fullSync } from '../services/syncService';
+import { syncLocalToCloud } from '../services/syncService';
+import { supabase } from '../services/supabase';
 
 export default function AddBook() {
   const navigate = useNavigate();
@@ -215,7 +216,23 @@ export default function AddBook() {
       };
       
       await db.books.add(newBook);
-      await fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
+
+      // Step 2: If user is signed in, sync to Supabase immediately
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        console.log('[AddBook] User signed in, syncing to cloud immediately...');
+        
+        const result = await syncLocalToCloud();
+        
+        if (result.failed > 0) {
+          console.warn('[AddBook] Some items failed to sync:', result);
+          // Don't block user — local save succeeded
+        } else {
+          console.log('[AddBook] Book synced to cloud successfully');
+        }
+      }
+
       navigate('/');
     } catch (err) {
       alert("Error saving book: " + err.message);

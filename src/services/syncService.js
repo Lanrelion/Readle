@@ -48,11 +48,13 @@ export async function syncDeletionsToCloud() {
 export async function syncLocalToCloud() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
-    console.log('[Sync] Not signed in, skipping sync');
+    console.log('[Sync] No session found. User must be signed in to sync.');
     return { uploaded: 0, failed: 0 };
   }
 
   const userId = session.user.id;
+  console.log('[Sync] Syncing as user:', session.user.email);
+
   let uploaded = 0;
   let failed = 0;
 
@@ -97,14 +99,24 @@ export async function syncLocalToCloud() {
           updated_at: book.updatedAt || new Date().toISOString(),
         };
 
-        const { error } = await supabase.from('books').upsert(bookData);
-        if (error) throw error;
+        const { error } = await supabase.from('books').upsert(bookData, { onConflict: 'id' });
+        if (error) {
+          console.error('[Sync] Supabase error for book:', book.title, {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+          });
+          failed++;
+          continue;
+        }
         
         // Mark as synced locally and update file_url
         await db.books.update(book.id, { synced: 1, file_url: fileUrl });
         uploaded++;
+        console.log('[Sync] ✓ Synced book:', book.title);
       } catch (error) {
-        console.error('[Sync] Failed to sync book:', book.title, error);
+        console.error('[Sync] Unexpected error:', error);
         failed++;
       }
     }
@@ -127,13 +139,20 @@ export async function syncLocalToCloud() {
           cfi: quote.cfi || null,
         };
 
-        const { error } = await supabase.from('quotes').upsert(quoteData);
-        if (error) throw error;
+        const { error } = await supabase.from('quotes').upsert(quoteData, { onConflict: 'id' });
+        if (error) {
+          console.error('[Sync] Supabase error for quote:', {
+            code: error.code,
+            message: error.message,
+          });
+          failed++;
+          continue;
+        }
         
         await db.quotes.update(quote.id, { synced: 1 });
         uploaded++;
       } catch (error) {
-        console.error('[Sync] Failed to sync quote:', quote.id, error);
+        console.error('[Sync] Quote sync error:', error);
         failed++;
       }
     }

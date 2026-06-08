@@ -34,72 +34,8 @@ if (navigator.storage && navigator.storage.persist) {
   });
 }
 
-export const seedMockData = async () => {
-  if (localStorage.getItem('mockDataSeeded') === 'true') return;
-
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    localStorage.setItem('mockDataSeeded', 'true');
-    return;
-  }
-
-  const count = await db.books.count();
-  if (count > 0) {
-    localStorage.setItem('mockDataSeeded', 'true');
-    return;
-  }
-
-  try {
-    await db.books.bulkAdd([
-    {
-      id: crypto.randomUUID(),
-      type: 'ebook',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      isbn: '978-0-441-13597-7',
-      status: 'reading',
-      cover: 'https://m.media-amazon.com/images/I/41D-A14y7GL._SY445_SX342_.jpg',
-      progress: { type: 'percentage', value: 45 },
-      dateAdded: new Date().toISOString(),
-      dateCompleted: null,
-      metadata: { totalPages: 688, language: 'en' },
-      updatedAt: new Date().toISOString(),
-      synced: 0
-    },
-    {
-      id: crypto.randomUUID(),
-      type: 'physical',
-      title: 'The Hobbit',
-      author: 'J.R.R. Tolkien',
-      isbn: '978-0-547-92822-8',
-      status: 'completed',
-      cover: 'https://m.media-amazon.com/images/I/41E9bHj1VKL._SY445_SX342_.jpg',
-      progress: { type: 'pages', value: '310/310' },
-      dateAdded: '2025-04-15T14:30:00Z',
-      dateCompleted: '2025-05-05T18:00:00Z',
-      updatedAt: '2025-05-05T18:00:00Z',
-      synced: 0
-    },
-    {
-      id: crypto.randomUUID(),
-      type: 'pdf',
-      title: 'Project Hail Mary',
-      author: 'Andy Weir',
-      isbn: '978-0593135204',
-      status: 'wantToRead',
-      cover: 'https://m.media-amazon.com/images/I/51A31LozjPL._SY445_SX342_.jpg',
-      progress: { type: 'percentage', value: 0 },
-      dateAdded: new Date().toISOString(),
-      dateCompleted: null,
-      updatedAt: new Date().toISOString(),
-      synced: 0
-    }
-  ]);
-  localStorage.setItem('mockDataSeeded', 'true');
-} catch (error) {
-  console.warn('[DB] Failed to seed mock data:', error);
-}
-};
+// No seeder. New users start with an empty library.
+// The empty state is handled by LibraryDashboard's empty state UI.
 
 // Add helper to save PDF progress
 export async function savePDFProgress(bookId, currentPage, totalPages) {
@@ -201,4 +137,23 @@ export async function saveBookProgress(bookId, progressData) {
     lastReadDate: new Date().toISOString(),
     synced: 0,
   });
+}
+
+// One-time cleanup: remove seed books from local IndexedDB
+export async function removeSeedBooks() {
+  const seedTitles = ['Dune', 'The Hobbit', 'Project Hail Mary'];
+  const seedAuthors = ['Frank Herbert', 'J.R.R. Tolkien', 'Andy Weir'];
+  
+  const booksToDelete = await db.books
+    .filter(book => 
+      seedTitles.includes(book.title) && 
+      seedAuthors.includes(book.author)
+    )
+    .toArray();
+  
+  if (booksToDelete.length > 0) {
+    const ids = booksToDelete.map(b => b.id);
+    await db.books.bulkDelete(ids);
+    console.log('[DB] Removed', booksToDelete.length, 'seed books');
+  }
 }

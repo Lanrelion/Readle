@@ -11,7 +11,7 @@ import { AuthModal } from './components/AuthModal';
 import ScrollToTop from './components/ScrollToTop';
 import { supabase } from './services/supabase';
 import { fullSync } from './services/syncService';
-import { clearLocalDatabase } from './services/db';
+import { clearLocalDatabase, removeSeedBooks } from './services/db';
 import './App.css';
 
 function App() {
@@ -25,6 +25,11 @@ function App() {
     } catch { return null; }
   });
   const [isPurging, setIsPurging] = useState(() => localStorage.getItem('needsDBClear') === 'true');
+
+  useEffect(() => {
+    // One-time cleanup for existing users who have seed books
+    removeSeedBooks();
+  }, []);
 
   // Purge database on boot if needed (guarantees no locks from active React component trees)
   useEffect(() => {
