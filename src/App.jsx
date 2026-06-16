@@ -13,6 +13,7 @@ import { supabase } from './services/supabase';
 import { fullSync } from './services/syncService';
 import { clearLocalDatabase, removeSeedBooks } from './services/db';
 import { getProfile, updateLastSeen } from './services/profileService';
+import { repairMissingCovers } from './services/repairService';
 import './App.css';
 
 function App() {
@@ -30,6 +31,9 @@ function App() {
   useEffect(() => {
     // One-time cleanup for existing users who have seed books
     removeSeedBooks();
+    
+    // Repair any missing base64 covers from downloaded blobs
+    repairMissingCovers();
   }, []);
 
   // Purge database on boot if needed (guarantees no locks from active React component trees)

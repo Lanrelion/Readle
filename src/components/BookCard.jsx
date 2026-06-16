@@ -77,18 +77,22 @@ export default function BookCard({ book }) {
       >
         {/* Cover Image */}
         <div className="relative aspect-[3/4] w-full overflow-hidden bg-background-tertiary/30 rounded-none">
-          {book.cover ? (
+          {book.cover && book.cover !== 'null' && (
             <img 
               src={book.cover} 
               alt={`Cover of ${book.title}`} 
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-102"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-102 absolute inset-0 z-10"
+              onError={(e) => {
+                e.target.style.display = 'none'; // hide broken image to reveal placeholder underneath
+              }}
             />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-indigo/10 to-background-tertiary/40 p-4 text-center transition-transform duration-500 group-hover:scale-102">
-              <span className="text-lg font-serif font-normal text-foreground/80 line-clamp-3 leading-snug">{book.title}</span>
-              <span className="mt-2 text-[11px] font-accent text-foreground-secondary line-clamp-1">{book.author}</span>
-            </div>
           )}
+          
+          {/* Always render placeholder underneath as fallback */}
+          <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-indigo/10 to-background-tertiary/40 p-4 text-center transition-transform duration-500 group-hover:scale-102 absolute inset-0 z-0">
+            <span className="text-lg font-serif font-normal text-foreground/80 line-clamp-3 leading-snug">{book.title}</span>
+            <span className="mt-2 text-[11px] font-accent text-foreground-secondary line-clamp-1">{book.author}</span>
+          </div>
           
           {/* Status Badge Overlay */}
           <div className="absolute right-3 top-3">

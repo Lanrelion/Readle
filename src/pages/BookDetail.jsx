@@ -357,14 +357,20 @@ export default function BookDetail() {
               ref={bookCover}
               className="aspect-[3/4] w-full overflow-hidden rounded-none border border-foreground-tertiary/20 bg-background-secondary shadow-xl relative"
             >
-              {book.cover ? (
-                <img src={book.cover} alt={`Cover of ${book.title}`} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center p-6 text-center bg-background-secondary">
-                  <span className="text-xl font-serif font-normal text-foreground line-clamp-4 leading-snug">{book.title}</span>
-                  <span className="mt-4 text-[10px] font-accent text-foreground-tertiary uppercase tracking-widest line-clamp-2">{book.author}</span>
-                </div>
+              {book.cover && book.cover !== 'null' && (
+                <img 
+                  src={book.cover} 
+                  alt={`Cover of ${book.title}`}
+                  className="w-full h-full object-cover absolute inset-0 z-10"
+                  onError={(e) => {
+                    e.target.style.display = 'none'; // hide broken image to reveal placeholder underneath
+                  }}
+                />
               )}
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center absolute inset-0 z-0">
+                <span className="text-xl font-serif text-foreground/80 line-clamp-3 mb-2">{book.title}</span>
+                <span className="text-sm font-accent text-foreground-secondary line-clamp-2">{book.author}</span>
+              </div>
             </div>
             
             {/* Ebook/PDF Read CTA or File Attached States */}
