@@ -5,7 +5,134 @@ import { ArrowLeft, Trash, PencilSimple, CheckCircle, BookOpen } from '@phosphor
 import { db, deleteBook, deleteQuote, saveBookProgress } from '../services/db';
 import Navigation from '../components/Navigation';
 import { fullSync } from '../services/syncService';
+import { supabase } from '../services/supabase';
 import gsap from 'gsap';
+
+// Helper
+function formatRelativeTime(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+function NotesTab({ book, onDelete }) {
+  const [notes, setNotes] = useState(book.notes || '');
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const saveTimerRef = useRef(null);
+  const isEditingRef = useRef(false);
+
+  // Sync notes from book prop when not actively editing
+  // (e.g. if notes were updated from another device/tab)
+  useEffect(() => {
+    if (!isEditingRef.current) {
+      setNotes(book.notes || '');
+    }
+  }, [book.notes]);
+
+  // Auto-save notes 1.5 seconds after user stops typing
+  const handleNotesChange = (e) => {
+    const value = e.target.value;
+    isEditingRef.current = true;
+    setNotes(value);
+
+    // Clear existing timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    // Set new timer to save
+    saveTimerRef.current = setTimeout(async () => {
+      await saveNotes(value);
+      isEditingRef.current = false;
+    }, 1500);
+  };
+
+  const saveNotes = async (notesValue) => {
+    setSaving(true);
+    try {
+      // Save to IndexedDB
+      await db.books.update(book.id, { notes: notesValue, synced: 0 }); // mark unsynced just in case full sync runs
+
+      // Sync to Supabase if signed in
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await supabase
+          .from('books')
+          .update({ 
+            notes: notesValue,
+            // the user prompt included updating metadata as well, so we keep it to prevent data loss if they rely on it
+            metadata: { ...(book.metadata || {}), notes: notesValue }
+          })
+          .eq('id', book.id);
+          
+        await db.books.update(book.id, { synced: 1 });
+      }
+
+      setLastSaved(new Date());
+      console.log('[Notes] Auto-saved');
+    } catch (error) {
+      console.error('[Notes] Failed to save:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="space-y-4 text-foreground-secondary font-sans leading-relaxed text-sm">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
+          Personal Notes
+        </h3>
+        <span className="text-xs text-foreground-tertiary">
+          {saving
+            ? 'Saving...'
+            : lastSaved
+            ? `Saved ${formatRelativeTime(lastSaved)}`
+            : ''}
+        </span>
+      </div>
+
+      <textarea
+        value={notes}
+        onChange={handleNotesChange}
+        placeholder="Write your thoughts, character notes, favourite moments, or reading log entries for this book..."
+        rows={12}
+        className="
+          w-full px-4 py-3
+          bg-background border border-foreground-tertiary/20
+          rounded-none
+          text-foreground text-sm font-sans leading-relaxed
+          placeholder-foreground-tertiary/50
+          resize-none
+          focus:outline-none focus:border-indigo
+          transition duration-200
+        "
+      />
+
+      <div className="pt-2 flex justify-between items-center">
+        <p className="text-xs text-foreground-tertiary">
+          Notes are private and saved automatically as you type.
+        </p>
+        <button 
+          onClick={onDelete}
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-vermillion border border-vermillion/20 hover:bg-vermillion hover:text-background transition duration-300 rounded-none"
+        >
+          <Trash size={14} weight="thin" />
+          Delete Volume
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function BookDetail() {
   const { id } = useParams();
@@ -28,9 +155,13 @@ export default function BookDetail() {
     return bookQuotes.sort((a, b) => new Date(b.dateSaved) - new Date(a.dateSaved));
   }, [id]);
 
-  // Premium Cinematic GSAP Book-Opening Transition
+  const hasAnimated = useRef(false);
+
+  // Premium Cinematic GSAP Book-Opening Transition — runs once on first render
   useEffect(() => {
     if (!book || !detailContainer.current || !bookCover.current || !metadata.current) return;
+    if (hasAnimated.current) return;
+    hasAnimated.current = true;
     
     const ctx = gsap.context(() => {
       gsap.timeline()
@@ -403,20 +534,7 @@ export default function BookDetail() {
                 
                 {/* Notes/Book details Tab */}
                 {activeTab === 'notes' && (
-                  <div className="space-y-4 text-foreground-secondary font-sans leading-relaxed text-sm">
-                    <p>
-                      {book.notes || 'No notes saved for this volume. You can write your custom reading log reviews or character lists in the notebook settings.'}
-                    </p>
-                    <div className="pt-8 flex justify-end">
-                      <button 
-                        onClick={handleDelete}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-vermillion border border-vermillion/20 hover:bg-vermillion hover:text-background transition duration-300 rounded-none"
-                      >
-                        <Trash size={14} weight="thin" />
-                        Delete Volume
-                      </button>
-                    </div>
-                  </div>
+                  <NotesTab book={book} onDelete={handleDelete} />
                 )}
 
                 {/* Quotes Collection Tab */}

@@ -217,26 +217,26 @@ export default function AddBook() {
       
       await db.books.add(newBook);
 
-      // Step 2: If user is signed in, sync to Supabase immediately
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        console.log('[AddBook] User signed in, syncing to cloud immediately...');
-        
-        const result = await syncLocalToCloud();
-        
-        if (result.failed > 0) {
-          console.warn('[AddBook] Some items failed to sync:', result);
-          // Don't block user — local save succeeded
-        } else {
-          console.log('[AddBook] Book synced to cloud successfully');
-        }
-      }
-
+      // Navigate immediately — the book is saved locally
       navigate('/');
+
+      // Fire cloud sync in the background (non-blocking)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          console.log('[AddBook] Syncing to cloud in background...');
+          syncLocalToCloud()
+            .then(result => {
+              if (result.failed > 0) {
+                console.warn('[AddBook] Some items failed to sync:', result);
+              } else {
+                console.log('[AddBook] Book synced to cloud successfully');
+              }
+            })
+            .catch(err => console.warn('[AddBook] Background sync failed:', err));
+        }
+      });
     } catch (err) {
       alert("Error saving book: " + err.message);
-    } finally {
       setIsLoading(false);
     }
   };

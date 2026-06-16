@@ -95,6 +95,7 @@ export async function syncLocalToCloud() {
           date_completed: book.dateCompleted || null,
           file_url: fileUrl,
           metadata: book.metadata || null,
+          notes: book.notes || null, // Add notes field
           // [Bug 4] Include updated_at so cloud and local timestamps stay aligned
           updated_at: book.updatedAt || new Date().toISOString(),
         };
@@ -267,6 +268,7 @@ export async function syncCloudToLocal() {
             dateCompleted: book.date_completed,
             file_url: book.file_url,
             metadata: book.metadata,
+            notes: book.notes,
             updatedAt: book.updated_at,
             synced: 1,
             fileBlob: downloadedBlob // Will be Blob or null
@@ -299,6 +301,7 @@ export async function syncCloudToLocal() {
               dateCompleted: book.date_completed,
               file_url: book.file_url,
               metadata: book.metadata,
+              notes: book.notes,
               updatedAt: book.updated_at,
               synced: 1,
               fileBlob: downloadedBlob

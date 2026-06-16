@@ -12,6 +12,7 @@ import ScrollToTop from './components/ScrollToTop';
 import { supabase } from './services/supabase';
 import { fullSync } from './services/syncService';
 import { clearLocalDatabase, removeSeedBooks } from './services/db';
+import { getProfile, updateLastSeen } from './services/profileService';
 import './App.css';
 
 function App() {
@@ -74,7 +75,7 @@ function App() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         const sessionUser = session?.user || null;
         setUser(sessionUser);
         
@@ -85,10 +86,16 @@ function App() {
           localStorage.removeItem('cachedUser');
         }
 
-        // [Bug 9] Removed fullSync() from here — the background sync useEffect
-        // below already triggers when `user` changes, preventing double sync.
-        if (event === 'SIGNED_IN') {
-          console.log('[App] User signed in — sync will trigger via background effect');
+        if (event === 'SIGNED_IN' && session) {
+          // Update last seen
+          await updateLastSeen(session.user.id);
+          
+          // Get profile
+          const profile = await getProfile(session.user.id);
+          console.log('[App] User profile:', profile);
+          
+          // Run full sync
+          await fullSync();
         }
       }
     );

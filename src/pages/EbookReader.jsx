@@ -19,7 +19,10 @@ export default function EbookReader() {
   const [readingProgress, setReadingProgress] = useState({ page: 0, total: 0, percentage: 0 });
   const [isReady, setIsReady] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [fontSize, setFontSize] = useState(100);
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('readle-font-zoom');
+    return saved ? parseInt(saved, 10) : 100;
+  });
   const [pendingQuote, setPendingQuote] = useState(null);
   const [quoteColor, setQuoteColor] = useState('#F5F1E8');
   const { theme } = useTheme();
@@ -194,15 +197,20 @@ export default function EbookReader() {
       // Custom quiet editorial themes injected into epub document iframe
       rendition.themes.register('light', {
         body: { background: '#F5F1E8', color: '#1D1B18', padding: '0 24px', 'font-family': '"Noto Serif JP", serif' },
-        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#1D1B18 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important', 'font-size': '17px !important' }
+        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#1D1B18 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
       });
       rendition.themes.register('dark', {
         body: { background: '#1A1813', color: '#F5F1E8', padding: '0 24px', 'font-family': '"Noto Serif JP", serif' },
-        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#F5F1E8 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important', 'font-size': '17px !important' }
+        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#F5F1E8 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
       });
       
       rendition.themes.select(theme);
       rendition.themes.fontSize(`${fontSize}%`);
+      try {
+        rendition.themes.override('font-size', `${fontSize}%`);
+      } catch (e) {
+        // Fallback for older epub.js versions
+      }
     };
     
     fileReader.readAsArrayBuffer(bookData.fileBlob);
@@ -219,19 +227,74 @@ export default function EbookReader() {
     };
   }, []);
 
+  // Save zoom when changed
+  useEffect(() => {
+    localStorage.setItem('readle-font-zoom', fontSize.toString());
+  }, [fontSize]);
+
   // Update themes and zoom sizes reactively without tearing down the renderer
   useEffect(() => {
     if (renditionRef.current) {
       renditionRef.current.themes.fontSize(`${fontSize}%`);
+      try {
+        renditionRef.current.themes.override('font-size', `${fontSize}%`);
+      } catch (e) {
+        // Fallback for older epub.js versions
+      }
       renditionRef.current.themes.select(theme);
     }
   }, [fontSize, theme]);
+
+  // Add touch swipe support
+  useEffect(() => {
+    if (!isReady || !renditionRef.current) return;
+
+    const handleKeyUp = (e) => {
+      if (e.key === 'ArrowRight') renditionRef.current?.next();
+      if (e.key === 'ArrowLeft') renditionRef.current?.prev();
+    };
+
+    let touchStartX = 0;
+
+    const handleTouchStart = (e) => {
+      touchStartX = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+      if (Math.abs(diff) > 50) { // Minimum swipe distance
+        if (diff > 0) {
+          renditionRef.current?.next(); // Swipe left = next page
+        } else {
+          renditionRef.current?.prev(); // Swipe right = prev page
+        }
+      }
+    };
+
+    document.addEventListener('keyup', handleKeyUp);
+    
+    // Add touch listener to the viewer element
+    const viewer = viewerRef.current;
+    if (viewer) {
+      viewer.addEventListener('touchstart', handleTouchStart, { passive: true });
+      viewer.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+
+    return () => {
+      document.removeEventListener('keyup', handleKeyUp);
+      if (viewer) {
+        viewer.removeEventListener('touchstart', handleTouchStart);
+        viewer.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+  }, [isReady]);
 
   const next = () => renditionRef.current?.next();
   const prev = () => renditionRef.current?.prev();
 
   const handleZoomIn = () => setFontSize(prev => Math.min(200, prev + 10));
-  const handleZoomOut = () => setFontSize(prev => Math.max(50, prev - 10));
+  const handleZoomOut = () => setFontSize(prev => Math.max(70, prev - 10));
 
   if (bookData === undefined) {
     return (
@@ -284,10 +347,10 @@ export default function EbookReader() {
 
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-background text-foreground font-sans z-50">
+    <div className="fixed inset-0 bg-background flex flex-col text-foreground font-sans z-50">
       
       {/* Top Header Panel (rounded-none, border-b border-foreground-tertiary/20) */}
-      <header className={`fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex justify-between items-center px-6 z-50 transition-transform duration-300 ${isReady ? 'translate-y-0' : '-translate-y-full'}`}>
+      <header className={`h-16 flex-shrink-0 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex justify-between items-center px-6 z-50 transition-transform duration-300 ${isReady ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate(-1)} 
@@ -315,13 +378,30 @@ export default function EbookReader() {
       {/* Floating Settings Tooltip Menu */}
       {showControls && (
         <div className="absolute right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-72">
-          <h3 className="mb-4 text-xs font-accent text-foreground-tertiary uppercase tracking-widest border-b border-foreground-tertiary/10 pb-2">Reading Preferences</h3>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-sans font-medium text-foreground">Font Zoom</span>
-            <div className="flex items-center rounded-none border border-foreground-tertiary/30 bg-background overflow-hidden">
-              <button onClick={handleZoomOut} className="px-3 py-1 hover:bg-background-secondary text-foreground transition-colors">-</button>
-              <span className="text-xs font-medium text-foreground w-12 text-center border-x border-foreground-tertiary/20">{fontSize}%</span>
-              <button onClick={handleZoomIn} className="px-3 py-1 hover:bg-background-secondary text-foreground transition-colors">+</button>
+          <div className="space-y-3">
+            <p className="mb-4 text-xs font-accent text-foreground-tertiary tracking-widest uppercase border-b border-foreground-tertiary/10 pb-2">
+              Reading Preferences
+            </p>
+            
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-sans text-foreground">Font Zoom</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleZoomOut}
+                  className="w-8 h-8 flex items-center justify-center border border-foreground-tertiary/30 bg-background rounded-none hover:bg-background-secondary transition"
+                >
+                  −
+                </button>
+                <span className="text-sm font-sans text-foreground w-12 text-center">
+                  {fontSize}%
+                </span>
+                <button
+                  onClick={handleZoomIn}
+                  className="w-8 h-8 flex items-center justify-center border border-foreground-tertiary/30 bg-background rounded-none hover:bg-background-secondary transition"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -390,8 +470,15 @@ export default function EbookReader() {
       )}
 
       {/* Primary Rendition Area */}
-      <div className="absolute inset-0 pt-16 pb-20 bg-background flex justify-center">
-        <div ref={viewerRef} className="h-full w-full max-w-3xl" />
+      <div className="flex-1 w-full bg-background flex justify-center overflow-hidden">
+        <div 
+          ref={viewerRef} 
+          className="w-full max-w-3xl" 
+          style={{ 
+            height: 'calc(100vh - 144px)', // 100vh - header(64px) - footer(80px)
+            overflow: 'hidden' 
+          }} 
+        />
       </div>
 
       {/* Navigation Arrows */}
@@ -412,7 +499,7 @@ export default function EbookReader() {
       </button>
 
       {/* Bottom Progress Controls Panel */}
-      <div className="fixed bottom-0 left-0 right-0 h-20 bg-background/95 backdrop-blur border-t border-foreground-tertiary/20 flex flex-col gap-3 p-4 z-50 justify-center">
+      <div className="h-20 flex-shrink-0 bg-background/95 backdrop-blur border-t border-foreground-tertiary/20 flex flex-col gap-3 p-4 z-50 justify-center">
         <div className="w-full h-1 bg-foreground-tertiary/20 rounded-full overflow-hidden">
           <div className="h-full bg-moss transition-all duration-300" style={{ width: `${readingProgress.percentage}%` }} />
         </div>
