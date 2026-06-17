@@ -196,11 +196,11 @@ export default function EbookReader() {
 
       // Custom quiet editorial themes injected into epub document iframe
       rendition.themes.register('light', {
-        body: { background: '#F5F1E8', color: '#1D1B18', padding: '0 24px', 'font-family': '"Noto Serif JP", serif' },
+        body: { background: '#F5F1E8', color: '#1D1B18', padding: '24px 24px 48px 24px !important', 'font-family': '"Noto Serif JP", serif' },
         'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#1D1B18 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
       });
       rendition.themes.register('dark', {
-        body: { background: '#1A1813', color: '#F5F1E8', padding: '0 24px', 'font-family': '"Noto Serif JP", serif' },
+        body: { background: '#1A1813', color: '#F5F1E8', padding: '24px 24px 48px 24px !important', 'font-family': '"Noto Serif JP", serif' },
         'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#F5F1E8 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
       });
       
@@ -294,7 +294,7 @@ export default function EbookReader() {
   const prev = () => renditionRef.current?.prev();
 
   const handleZoomIn = () => setFontSize(prev => Math.min(200, prev + 10));
-  const handleZoomOut = () => setFontSize(prev => Math.max(70, prev - 10));
+  const handleZoomOut = () => setFontSize(prev => Math.max(50, prev - 10));
 
   if (bookData === undefined) {
     return (
@@ -475,7 +475,7 @@ export default function EbookReader() {
           ref={viewerRef} 
           className="w-full max-w-3xl" 
           style={{ 
-            height: 'calc(100vh - 144px)', // 100vh - header(64px) - footer(80px)
+            height: 'calc(100dvh - 144px)', // 100dvh - header(64px) - footer(80px)
             overflow: 'hidden' 
           }} 
         />
