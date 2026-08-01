@@ -22,13 +22,8 @@ export default function Navigation() {
 
   return (
     <>
-      {/* Mobile Top Bar Logo (< 1024px) */}
-      <div className="lg:hidden flex items-center justify-center pt-6 pb-0">
-        <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
-          Garder
-        </span>
-      </div>
-      
+
+
       {/* Desktop Navigation Sidebar (>= 1024px) */}
       <nav className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-foreground-tertiary/20 bg-background-secondary p-6 z-40 lg:flex">
         <div className="mb-10 flex items-center justify-center">
@@ -85,23 +80,35 @@ export default function Navigation() {
 
       {/* Mobile Navigation Bottom Bar (< 1024px) */}
       <nav className="fixed bottom-0 left-0 right-0 h-20 border-t border-foreground-tertiary/20 bg-background/95 backdrop-blur z-40 flex justify-around items-center px-4 lg:hidden">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={(e) => animateClick(e.currentTarget)}
-              className={`flex flex-col items-center justify-center gap-1 w-16 h-16 transition duration-300 ${
-                isActive ? 'text-indigo' : 'text-foreground-secondary hover:text-indigo'
-              }`}
-            >
-              <Icon size={24} weight={isActive ? 'fill' : 'thin'} />
-              <span className="text-[11px] font-accent font-medium tracking-wide uppercase">
-                {item.label}
-              </span>
-            </Link>
+            <>
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={(e) => animateClick(e.currentTarget)}
+                className={`flex flex-col items-center justify-center gap-1 w-16 h-16 transition duration-300 ${
+                  isActive ? 'text-indigo' : 'text-foreground-secondary hover:text-indigo'
+                }`}
+              >
+                <Icon size={24} weight={isActive ? 'fill' : 'thin'} />
+                <span className="text-[11px] font-accent font-medium tracking-wide uppercase">
+                  {item.label}
+                </span>
+              </Link>
+              {/* Logo centered with dividers */}
+              {index === 1 && (
+                <div className="flex items-center gap-3 h-10 px-2 select-none pointer-events-none">
+                  <div className="w-px h-6 bg-foreground-tertiary/20"></div>
+                  <span className="font-serif text-lg font-normal tracking-tight text-foreground/60 leading-none">
+                    Garder
+                  </span>
+                  <div className="w-px h-6 bg-foreground-tertiary/20"></div>
+                </div>
+              )}
+            </>
           );
         })}
         
