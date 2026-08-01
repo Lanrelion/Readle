@@ -104,9 +104,14 @@ function App() {
       }
     );
 
+    // Listen for custom event to open modal from anywhere
+    const handleOpenAuth = () => setShowAuthModal(true);
+    window.addEventListener('open-auth-modal', handleOpenAuth);
+
     return () => {
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
+      window.removeEventListener('open-auth-modal', handleOpenAuth);
     };
   }, [isPurging]);
 

@@ -84,6 +84,9 @@ export default function LibraryDashboard({ user }) {
         results = await db.books.toArray();
       }
 
+      // Filter out skeleton records (cached files for signed-out users)
+      results = results.filter(b => !b._skeletonOnly);
+
       // In-memory post-filtering
       
       // 1. Filter by format (type) if it wasn't filtered by database query
