@@ -24,9 +24,9 @@ export default function Navigation() {
     <>
       {/* Desktop Navigation Sidebar (>= 1024px) */}
       <nav className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-foreground-tertiary/20 bg-background-secondary p-6 z-40 lg:flex">
-        <div className="mb-10 flex items-center gap-3">
+        <div className="mb-10 flex items-center justify-center">
           <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
-            Readle<span className="text-moss">.</span>
+            Garder
           </span>
         </div>
 
