@@ -83,6 +83,7 @@ export default function BookCard({ book }) {
               alt={`Cover of ${book.title}`} 
               className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-102 absolute inset-0 z-10"
               onError={(e) => {
+                console.error('[BookCard] Image failed to load for book:', book.title, 'Source:', book.cover ? book.cover.substring(0, 100) + '...' : 'none');
                 e.target.style.display = 'none'; // hide broken image to reveal placeholder underneath
               }}
             />

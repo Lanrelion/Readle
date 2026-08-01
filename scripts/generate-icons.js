@@ -38,7 +38,7 @@ const sizes = [192, 512];
 for (const size of sizes) {
   // Standard icon
   await sharp(baseIconPath)
-    .resize(size, size, { fit: 'contain', background: 'white' })
+    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toFile(path.join(ICON_DIR, `icon-${size}.png`));
   
@@ -46,7 +46,7 @@ for (const size of sizes) {
   
   // Maskable icon (for adaptive icons on Android)
   await sharp(baseIconPath)
-    .resize(size, size, { fit: 'contain', background: 'white' })
+    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toFile(path.join(ICON_DIR, `icon-${size}-maskable.png`));
   
