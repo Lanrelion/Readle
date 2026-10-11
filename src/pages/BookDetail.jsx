@@ -558,8 +558,8 @@ export default function BookDetail() {
             )}
 
             {/* Editorial Tabs Selection System */}
-            <div className="border-t border-foreground-tertiary/20">
-              <div className="flex gap-8 border-b border-foreground-tertiary/10 pb-px">
+            <div>
+              <div className="flex gap-8">
                 <button 
                   onClick={() => setActiveTab('notes')}
                   className={`text-sm font-sans font-medium pb-2 border-b-2 transition duration-300 ${
