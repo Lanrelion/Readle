@@ -9,6 +9,64 @@ import { PDFReader } from '../components/PDFReader';
 import { syncLocalToCloud } from '../services/syncService';
 
 
+
+function applyEpubThemeStyles(doc, isDark, fontMode) {
+  if (!doc) return;
+  let styleEl = doc.getElementById('garder-reader-theme-styles');
+  if (!styleEl) {
+    styleEl = doc.createElement('style');
+    styleEl.id = 'garder-reader-theme-styles';
+    doc.head.appendChild(styleEl);
+  }
+
+  const bgColor = isDark ? '#151413' : '#F5F1E8';
+  const textColor = isDark ? '#EDE8DF' : '#1D1B18';
+  const headingColor = isDark ? '#F7F3EB' : '#1D1B18';
+  const secondaryColor = isDark ? '#A39E93' : '#6E6B65';
+  const linkColor = isDark ? '#9CAFB7' : '#5C4A3A';
+
+  let fontRules = '';
+  if (fontMode === 'garder') {
+    fontRules = 'font-family: "Lora", "Georgia", serif !important;';
+  } else if (fontMode === 'sans') {
+    fontRules = 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;';
+  }
+
+  styleEl.textContent = `
+    html, body {
+      background-color: ${bgColor} !important;
+      color: ${textColor} !important;
+    }
+    body {
+      ${fontRules}
+      line-height: 1.8 !important;
+      max-width: 680px !important;
+      margin: 0 auto !important;
+      padding: 0 24px !important;
+      -webkit-font-smoothing: antialiased;
+    }
+    p, span, div, li, blockquote, dd, dt, article, section, em, strong, i, b {
+      color: ${textColor} !important;
+      background-color: transparent !important;
+      ${fontRules}
+    }
+    p {
+      margin-bottom: 1.25em !important;
+      text-align: left !important;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      color: ${headingColor} !important;
+      ${fontMode === 'garder' ? 'font-family: "Cormorant Garamond", serif !important; font-weight: 500 !important;' : fontRules}
+    }
+    small, .footnote, figcaption {
+      color: ${secondaryColor} !important;
+    }
+    a {
+      color: ${linkColor} !important;
+    }
+  `;
+}
+
 export default function EbookReader() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -23,8 +81,11 @@ export default function EbookReader() {
     const saved = localStorage.getItem('readle-font-zoom') || localStorage.getItem('garder-epub-zoom');
     return saved ? parseInt(saved, 10) : 100;
   });
-  const [useGarderFont, setUseGarderFont] = useState(() => {
-    return localStorage.getItem('garder-epub-font') !== 'original';
+  const [fontFamily, setFontFamily] = useState(() => {
+    return localStorage.getItem('garder-epub-font-family') || (localStorage.getItem('garder-epub-font') === 'original' ? 'original' : 'garder');
+  });
+  const [readerThemeMode, setReaderThemeMode] = useState(() => {
+    return localStorage.getItem('garder-epub-theme') || 'auto';
   });
   const [pendingQuote, setPendingQuote] = useState(null);
   const [quoteColor, setQuoteColor] = useState('#F5F1E8');
@@ -45,7 +106,8 @@ export default function EbookReader() {
     fadeTimerRef.current = setTimeout(() => setLogoVisible(false), 3000);
   };
 
-  const { theme } = useTheme();
+  const { isDark } = useTheme();
+  const effectiveDarkEpub = readerThemeMode === 'auto' ? isDark : readerThemeMode === 'dark';
 
   const bookData = useLiveQuery(() => db.books.get(id), [id]);
 
@@ -221,30 +283,21 @@ export default function EbookReader() {
         } catch {
           // Ignore if document head is unavailable
         }
+
+        // Apply initial theme styles into iframe
+        applyEpubThemeStyles(doc, effectiveDarkEpub, fontFamily);
       });
 
-      // Register and apply the Garder theme
+      // Register a minimal theme just for epubjs internals, actual styling is via injected <style>
       rendition.themes.register('garder', {
         'body': {
-          'font-family': '"Lora", "Georgia", serif !important',
-          'line-height': '1.8',
-          'color': '#1D1B18',
-          'background': '#F5F1E8',
           'max-width': '680px',
           'margin': '0 auto',
           'padding': '0 24px',
-        },
-        'p': {
-          'margin-bottom': '1.2em',
-          'text-align': 'left',
-        },
-        'h1, h2, h3': {
-          'font-family': '"Cormorant Garamond", serif !important',
-          'font-weight': '500',
         }
       });
 
-      rendition.themes.select(useGarderFont ? 'garder' : 'default');
+      rendition.themes.select('garder');
       rendition.themes.fontSize(`${fontZoom}%`);
     };
     
@@ -267,10 +320,15 @@ export default function EbookReader() {
     localStorage.setItem('readle-font-zoom', fontZoom.toString());
   }, [fontZoom]);
 
-  // Persist font preference to localStorage
+  // Persist font family preference
   useEffect(() => {
-    localStorage.setItem('garder-epub-font', useGarderFont ? 'garder' : 'original');
-  }, [useGarderFont]);
+    localStorage.setItem('garder-epub-font-family', fontFamily);
+  }, [fontFamily]);
+
+  // Persist reader theme mode
+  useEffect(() => {
+    localStorage.setItem('garder-epub-theme', readerThemeMode);
+  }, [readerThemeMode]);
 
   // When font zoom state changes, re-apply font size to the theme
   useEffect(() => {
@@ -278,12 +336,18 @@ export default function EbookReader() {
     renditionRef.current.themes.fontSize(`${fontZoom}%`);
   }, [fontZoom]);
 
-  // When font toggle changes, re-apply theme
+  // Re-apply theme styles when dark mode, font family, or reader theme mode changes
   useEffect(() => {
     if (!renditionRef.current) return;
-    renditionRef.current.themes.select(useGarderFont ? 'garder' : 'default');
-    renditionRef.current.themes.fontSize(`${fontZoom}%`);
-  }, [useGarderFont]);
+    const contents = renditionRef.current.getContents();
+    if (contents && contents.length > 0) {
+      contents.forEach(c => {
+        if (c.document) {
+          applyEpubThemeStyles(c.document, effectiveDarkEpub, fontFamily);
+        }
+      });
+    }
+  }, [effectiveDarkEpub, fontFamily]);
 
   // Add touch swipe support
   useEffect(() => {
@@ -410,7 +474,7 @@ export default function EbookReader() {
           <img
             src="/logo.svg"
             alt="Garder"
-            className="h-5 transition-opacity duration-700 select-none cursor-pointer"
+            className={`h-5 transition-opacity duration-700 select-none cursor-pointer ${isDark ? 'invert brightness-200' : ''}`}
             style={{ opacity: logoVisible ? 1 : 0.25 }}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
@@ -421,7 +485,7 @@ export default function EbookReader() {
           />
           {/* Fallback if no SVG */}
           <span
-            className="text-sm font-serif font-normal text-foreground-tertiary transition-opacity duration-700 select-none hidden"
+            className="text-sm font-serif font-normal text-foreground-secondary transition-opacity duration-700 select-none hidden"
             style={{ opacity: logoVisible ? 1 : 0.25 }}
           >
             garder.
@@ -443,69 +507,103 @@ export default function EbookReader() {
             className={`p-2 rounded-none transition duration-200 ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
             aria-label="Reading preferences"
           >
-            <SlidersHorizontal size={20} weight="thin" className="text-foreground-tertiary" />
+            <SlidersHorizontal size={20} weight="thin" className={showControls ? 'text-indigo' : 'text-foreground-tertiary'} />
           </button>
         </div>
       </header>
 
       {/* Floating Settings Tooltip Menu */}
       {showControls && (
-        <div className="absolute right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-72">
+        <div className="absolute right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-80">
           <div className="space-y-4">
             <p className="mb-4 text-xs font-accent text-foreground-tertiary tracking-widest uppercase border-b border-foreground-tertiary/10 pb-2">
               Reading Preferences
             </p>
 
+            {/* Font Family */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-sans text-foreground">Font</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setUseGarderFont(true);
-                    renditionRef.current?.themes.select('garder');
-                  }}
-                  className={`px-3 py-1 text-xs rounded-none border transition ${
-                    useGarderFont
-                      ? 'bg-indigo text-white border-indigo'
-                      : 'border-foreground-tertiary/30 text-foreground'
-                  }`}
-                >
-                  Garder
-                </button>
-                <button
-                  onClick={() => {
-                    setUseGarderFont(false);
-                    renditionRef.current?.themes.select('default');
-                  }}
-                  className={`px-3 py-1 text-xs rounded-none border transition ${
-                    !useGarderFont
-                      ? 'bg-indigo text-white border-indigo'
-                      : 'border-foreground-tertiary/30 text-foreground'
-                  }`}
-                >
-                  Original
-                </button>
+              <div className="flex gap-1">
+                {[
+                  { id: 'garder', label: 'Serif' },
+                  { id: 'sans', label: 'Sans' },
+                  { id: 'original', label: 'Original' }
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setFontFamily(opt.id)}
+                    className={`px-2.5 py-1 text-xs rounded-none border transition ${
+                      fontFamily === opt.id
+                        ? 'bg-indigo text-white border-indigo'
+                        : 'border-foreground-tertiary/30 text-foreground hover:bg-background'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
             
+            {/* Font Zoom */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-sans text-foreground">Font Zoom</span>
-              <div className="flex items-center gap-3">
+              <span className="text-sm font-sans text-foreground">Font Size</span>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={handleZoomOut}
-                  className="w-8 h-8 flex items-center justify-center border border-foreground-tertiary/30 bg-background rounded-none hover:bg-background-secondary transition"
+                  className="w-8 h-8 flex items-center justify-center border border-foreground-tertiary/30 bg-background rounded-none hover:bg-background-secondary transition text-foreground"
                 >
                   −
                 </button>
-                <span className="text-sm font-sans text-foreground w-12 text-center">
+                <span className="text-sm font-mono text-foreground w-12 text-center">
                   {fontZoom}%
                 </span>
                 <button
                   onClick={handleZoomIn}
-                  className="w-8 h-8 flex items-center justify-center border border-foreground-tertiary/30 bg-background rounded-none hover:bg-background-secondary transition"
+                  className="w-8 h-8 flex items-center justify-center border border-foreground-tertiary/30 bg-background rounded-none hover:bg-background-secondary transition text-foreground"
                 >
                   +
                 </button>
+              </div>
+            </div>
+
+            {/* Font Size Presets */}
+            <div className="flex gap-1.5 justify-end">
+              {[80, 100, 120, 150].map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => setFontZoom(preset)}
+                  className={`px-2 py-0.5 text-[11px] rounded-none border transition ${
+                    fontZoom === preset
+                      ? 'bg-indigo text-white border-indigo'
+                      : 'border-foreground-tertiary/30 text-foreground hover:bg-background'
+                  }`}
+                >
+                  {preset}%
+                </button>
+              ))}
+            </div>
+
+            {/* Page Tone */}
+            <div className="flex items-center justify-between pt-1 border-t border-foreground-tertiary/10">
+              <span className="text-sm font-sans text-foreground">Page Tone</span>
+              <div className="flex gap-1">
+                {[
+                  { id: 'auto', label: 'Auto' },
+                  { id: 'light', label: 'Light' },
+                  { id: 'dark', label: 'Dark' }
+                ].map(mode => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setReaderThemeMode(mode.id)}
+                    className={`px-2.5 py-1 text-xs rounded-none border transition ${
+                      readerThemeMode === mode.id
+                        ? 'bg-indigo text-white border-indigo'
+                        : 'border-foreground-tertiary/30 text-foreground hover:bg-background'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -575,7 +673,10 @@ export default function EbookReader() {
       )}
 
       {/* Primary Rendition Area */}
-      <div className="epub-reader-container flex-1 w-full bg-background flex justify-center overflow-hidden">
+      <div 
+        className="epub-reader-container flex-1 w-full flex justify-center overflow-hidden transition-colors duration-300"
+        style={{ backgroundColor: effectiveDarkEpub ? '#151413' : '#F5F1E8' }}
+      >
         <div 
           ref={viewerRef} 
           className="w-full max-w-3xl" 

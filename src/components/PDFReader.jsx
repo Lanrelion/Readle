@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { loadPDF, renderPage } from '../services/pdfService';
 import { savePDFProgress, loadPDFProgress } from '../services/db';
 import { Gear, ArrowLeft, SlidersHorizontal } from '@phosphor-icons/react';
+import { useTheme } from '../hooks/useTheme';
 
 export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
+  const { isDark } = useTheme();
   const [pdf, setPdf] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
@@ -29,9 +31,11 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
   const [contrast, setContrast] = useState(() => {
     return parseInt(localStorage.getItem('garder-pdf-contrast') || '100');
   });
-  const [isDarkPDF, setIsDarkPDF] = useState(() => {
-    return localStorage.getItem('garder-pdf-dark') === 'true';
+  const [pdfThemeMode, setPdfThemeMode] = useState(() => {
+    return localStorage.getItem('garder-pdf-theme') || 'auto';
   });
+
+  const effectiveDarkPDF = pdfThemeMode === 'auto' ? isDark : pdfThemeMode === 'dark';
 
   // Persist
   useEffect(() => {
@@ -39,8 +43,8 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
   }, [contrast]);
 
   useEffect(() => {
-    localStorage.setItem('garder-pdf-dark', isDarkPDF.toString());
-  }, [isDarkPDF]);
+    localStorage.setItem('garder-pdf-theme', pdfThemeMode);
+  }, [pdfThemeMode]);
 
   const canvasRef = useRef(null);
 
@@ -220,7 +224,7 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
           <img
             src="/logo.svg"
             alt="Garder"
-            className="h-5 transition-opacity duration-700 select-none cursor-pointer"
+            className={`h-5 transition-opacity duration-700 select-none cursor-pointer ${isDark ? 'invert brightness-200' : ''}`}
             style={{ opacity: logoVisible ? 1 : 0.25 }}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
@@ -231,7 +235,7 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
           />
           {/* Fallback if no SVG */}
           <span
-            className="text-sm font-serif font-normal text-foreground-tertiary transition-opacity duration-700 select-none hidden"
+            className="text-sm font-serif font-normal text-foreground-secondary transition-opacity duration-700 select-none hidden"
             style={{ opacity: logoVisible ? 1 : 0.25 }}
           >
             garder.
@@ -250,12 +254,12 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
               e.stopPropagation();
               zoomOut();
             }}
-            className="p-2 hover:bg-background-secondary rounded-none transition"
+            className="p-2 hover:bg-background-secondary rounded-none transition text-foreground"
             aria-label="Zoom out"
           >
             −
           </button>
-          <span className="text-xs text-foreground-tertiary">
+          <span className="text-xs text-foreground font-sans">
             {Math.round(scale * 100)}%
           </span>
           <button
@@ -263,7 +267,7 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
               e.stopPropagation();
               zoomIn();
             }}
-            className="p-2 hover:bg-background-secondary rounded-none transition"
+            className="p-2 hover:bg-background-secondary rounded-none transition text-foreground"
             aria-label="Zoom in"
           >
             +
@@ -276,30 +280,95 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
             className={`p-2 rounded-none transition ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
             aria-label="Reading preferences"
           >
-            <SlidersHorizontal size={20} weight="thin" className="text-foreground-tertiary" />
+            <SlidersHorizontal size={20} weight="thin" className={showControls ? 'text-indigo' : 'text-foreground-tertiary'} />
           </button>
         </div>
       </header>
 
       {/* Floating Settings Tooltip Menu */}
       {showControls && (
-        <div className="fixed right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-72">
+        <div className="fixed right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-80">
           <div className="space-y-4">
             <p className="mb-4 text-xs font-accent text-foreground-tertiary tracking-widest uppercase border-b border-foreground-tertiary/10 pb-2">
               Reading Preferences
             </p>
 
-            {/* Contrast */}
+            {/* Page Scale / Zoom Adjustment */}
             <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-sans text-foreground">Font / Zoom Size</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={zoomOut}
+                  className="w-8 h-8 border border-foreground-tertiary/30 rounded-none flex items-center justify-center text-foreground hover:bg-background transition"
+                  aria-label="Zoom out"
+                >
+                  −
+                </button>
+                <span className="text-xs text-foreground w-12 text-center font-mono">
+                  {Math.round(scale * 100)}%
+                </span>
+                <button
+                  onClick={zoomIn}
+                  className="w-8 h-8 border border-foreground-tertiary/30 rounded-none flex items-center justify-center text-foreground hover:bg-background transition"
+                  aria-label="Zoom in"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Scale Presets */}
+            <div className="flex gap-1.5 justify-end">
+              {[1.0, 1.25, 1.5, 2.0].map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => setScale(preset)}
+                  className={`px-2 py-0.5 text-[11px] rounded-none border transition ${
+                    Math.abs(scale - preset) < 0.05
+                      ? 'bg-indigo text-white border-indigo'
+                      : 'border-foreground-tertiary/30 text-foreground hover:bg-background'
+                  }`}
+                >
+                  {Math.round(preset * 100)}%
+                </button>
+              ))}
+            </div>
+
+            {/* Page Reading Tone / Dark Mode */}
+            <div className="flex items-center justify-between pt-1 border-t border-foreground-tertiary/10">
+              <span className="text-sm font-sans text-foreground">Page Tone</span>
+              <div className="flex gap-1">
+                {[
+                  { id: 'auto', label: 'Auto' },
+                  { id: 'light', label: 'Light' },
+                  { id: 'dark', label: 'Dark' }
+                ].map(mode => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setPdfThemeMode(mode.id)}
+                    className={`px-2.5 py-1 text-xs rounded-none border transition ${
+                      pdfThemeMode === mode.id
+                        ? 'bg-indigo text-white border-indigo'
+                        : 'border-foreground-tertiary/30 text-foreground hover:bg-background'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Contrast */}
+            <div className="flex items-center justify-between gap-4 pt-1 border-t border-foreground-tertiary/10">
               <span className="text-sm font-sans text-foreground">Contrast</span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setContrast(c => Math.max(c - 10, 70))}
                   className="w-8 h-8 border border-foreground-tertiary/30 rounded-none flex items-center justify-center text-foreground hover:bg-background transition"
                 >
                   −
                 </button>
-                <span className="text-xs text-foreground w-10 text-center">{contrast}%</span>
+                <span className="text-xs text-foreground w-12 text-center font-mono">{contrast}%</span>
                 <button
                   onClick={() => setContrast(c => Math.min(c + 10, 130))}
                   className="w-8 h-8 border border-foreground-tertiary/30 rounded-none flex items-center justify-center text-foreground hover:bg-background transition"
@@ -307,21 +376,6 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
                   +
                 </button>
               </div>
-            </div>
-
-            {/* Dark mode */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-sans text-foreground">Dark Page</span>
-              <button
-                onClick={() => setIsDarkPDF(d => !d)}
-                className={`px-3 py-1 text-xs rounded-none border transition ${
-                  isDarkPDF
-                    ? 'bg-indigo text-white border-indigo'
-                    : 'border-foreground-tertiary/30 text-foreground'
-                }`}
-              >
-                {isDarkPDF ? 'On' : 'Off'}
-              </button>
             </div>
           </div>
         </div>
@@ -334,8 +388,8 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
           <canvas
             ref={canvasRef}
             style={{
-              filter: isDarkPDF
-                ? `invert(1) contrast(${contrast}%)`
+              filter: effectiveDarkPDF
+                ? `invert(0.92) hue-rotate(180deg) contrast(${contrast}%)`
                 : `contrast(${contrast}%)`,
               display: 'block',
             }}

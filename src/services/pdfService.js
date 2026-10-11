@@ -31,6 +31,10 @@ export async function renderPage(page, canvas, scale = 1.5) {
   canvas.height = viewport.height;
   canvas.width = viewport.width;
   
+  // Fill solid white background so transparent PDFs don't blend into dark mode backgrounds
+  context.fillStyle = '#FFFFFF';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  
   const renderContext = {
     canvasContext: context,
     viewport: viewport,
