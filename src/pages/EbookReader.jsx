@@ -564,7 +564,7 @@ export default function EbookReader() {
                     
                     setPendingQuote(null);
                   }}
-                  className="rounded-none bg-indigo px-5 py-2 text-xs font-sans font-medium text-background shadow-md transition hover:bg-clay"
+                  className="rounded-none bg-indigo px-5 py-2 text-xs font-sans font-medium text-white shadow-md transition hover:bg-clay"
                 >
                   Save Quote
                 </button>

@@ -1,12 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Plus, Quotes, Sun, Moon } from '@phosphor-icons/react';
+import { BookOpen, Plus, Quotes, Sun, Moon, Desktop } from '@phosphor-icons/react';
 import { useTheme } from '../hooks/useTheme';
 
 import gsap from 'gsap';
 
 export default function Navigation() {
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, mode, toggleTheme } = useTheme();
 
   const animateClick = (element) => {
     gsap.timeline()
@@ -43,7 +43,7 @@ export default function Navigation() {
                 onClick={(e) => animateClick(e.currentTarget)}
                 className={`flex items-center gap-4 px-4 py-3 font-sans text-base font-normal rounded-none transition duration-300 ${
                   isActive
-                    ? 'bg-indigo text-background'
+                    ? 'bg-indigo text-white font-medium'
                     : 'text-foreground hover:bg-background/50 hover:text-indigo'
                 }`}
               >
@@ -62,16 +62,27 @@ export default function Navigation() {
               toggleTheme();
             }}
             className="flex w-full items-center gap-4 px-4 py-3 font-sans text-base font-normal text-foreground hover:bg-background/50 hover:text-indigo rounded-none transition duration-300"
+            title={`Current theme: ${mode === 'system' ? `Device (${theme})` : mode}. Click to change.`}
           >
-            {theme === 'dark' ? (
+            {mode === 'system' ? (
               <>
-                <Sun size={22} weight="thin" className="text-gold" />
-                <span>Light Mode</span>
+                <Desktop size={22} weight="thin" className="text-indigo" />
+                <div className="flex items-baseline gap-2">
+                  <span>Device</span>
+                  <span className="text-[10px] font-accent uppercase tracking-widest text-foreground-tertiary">
+                    Auto
+                  </span>
+                </div>
+              </>
+            ) : mode === 'dark' ? (
+              <>
+                <Moon size={22} weight="thin" className="text-gold" />
+                <span>Dark Mode</span>
               </>
             ) : (
               <>
-                <Moon size={22} weight="thin" className="text-foreground-secondary" />
-                <span>Dark Mode</span>
+                <Sun size={22} weight="thin" className="text-amber-600" />
+                <span>Light Mode</span>
               </>
             )}
           </button>
@@ -112,16 +123,22 @@ export default function Navigation() {
           }}
           className="flex flex-col items-center gap-1 px-3 py-2 text-foreground-tertiary border-t-2 border-transparent transition"
           aria-label="Toggle theme"
+          title={`Theme: ${mode === 'system' ? 'Device' : mode}`}
         >
-          {theme === 'dark' ? (
+          {mode === 'system' ? (
             <>
-              <Sun size={22} weight="thin" className="text-gold" />
-              <span className="text-[10px] font-accent tracking-widest uppercase">Light</span>
+              <Desktop size={22} weight="thin" className="text-indigo" />
+              <span className="text-[10px] font-accent tracking-widest uppercase">Auto</span>
+            </>
+          ) : mode === 'dark' ? (
+            <>
+              <Moon size={22} weight="thin" className="text-gold" />
+              <span className="text-[10px] font-accent tracking-widest uppercase">Dark</span>
             </>
           ) : (
             <>
-              <Moon size={22} weight="thin" />
-              <span className="text-[10px] font-accent tracking-widest uppercase">Dark</span>
+              <Sun size={22} weight="thin" className="text-amber-600" />
+              <span className="text-[10px] font-accent tracking-widest uppercase">Light</span>
             </>
           )}
         </button>

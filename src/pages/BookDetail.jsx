@@ -6,6 +6,8 @@ import { db, deleteBook, deleteQuote, saveBookProgress } from '../services/db';
 import Navigation from '../components/Navigation';
 import { fullSync } from '../services/syncService';
 import { supabase } from '../services/supabase';
+import { useTheme } from '../hooks/useTheme';
+import { getQuoteTheme } from '../utils/quoteColors';
 import gsap from 'gsap';
 
 // Helper
@@ -147,6 +149,7 @@ function NotesTab({ book, onDelete }) {
 export default function BookDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isDark } = useTheme();
   
   const [isEditingProgress, setIsEditingProgress] = useState(false);
   const [newProgress, setNewProgress] = useState('');
@@ -630,7 +633,7 @@ export default function BookDetail() {
                             </button>
                             <button 
                               onClick={handleSaveQuote}
-                              className="px-5 py-2 bg-indigo text-background text-xs font-sans font-medium hover:bg-clay transition duration-300"
+                              className="px-5 py-2 bg-indigo text-white text-xs font-sans font-medium hover:bg-clay transition duration-300"
                             >
                               Save Quote
                             </button>
@@ -647,33 +650,36 @@ export default function BookDetail() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {quotes.map(quote => (
-                          <div 
-                            key={quote.id} 
-                            className="relative group rounded-none p-6 shadow-sm border-l-4 border-moss border border-foreground-tertiary/10 transition duration-300 hover:shadow-md" 
-                            style={{ 
-                              backgroundColor: quote.color || '#EFE9DD',
-                              borderLeftColor: quote.color === '#F5F1E8' ? '#66785F' : (quote.color === '#E3E9F1' ? '#4A5A73' : '#8A6A55')
-                            }}
-                          >
-                            <p className="text-base font-serif italic text-foreground leading-relaxed pr-8">
-                              "{quote.text}"
-                            </p>
-                            
-                            <div className="flex justify-between items-baseline pt-4 mt-4 border-t border-foreground-tertiary/10">
-                              <span className="text-[11px] font-accent text-foreground-tertiary uppercase tracking-wider">
-                                Saved {new Date(quote.dateSaved).toLocaleDateString()}
-                              </span>
-                              <button 
-                                onClick={() => handleDeleteQuote(quote.id)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-red-700 border border-red-200 hover:bg-red-50 rounded-none"
-                                title="Delete Quote"
-                              >
-                                <Trash size={16} weight="thin" />
-                              </button>
+                        {quotes.map(quote => {
+                          const cardTheme = getQuoteTheme(quote.color, isDark);
+                          return (
+                            <div 
+                              key={quote.id} 
+                              className="relative group rounded-none p-6 shadow-sm border-l-4 border border-foreground-tertiary/15 transition duration-300 hover:shadow-md" 
+                              style={{ 
+                                backgroundColor: cardTheme.backgroundColor,
+                                borderLeftColor: cardTheme.borderLeftColor,
+                              }}
+                            >
+                              <p className="text-base font-serif italic text-foreground leading-relaxed pr-8">
+                                "{quote.text}"
+                              </p>
+                              
+                              <div className="flex justify-between items-baseline pt-4 mt-4 border-t border-foreground-tertiary/15">
+                                <span className="text-[11px] font-accent text-foreground-tertiary uppercase tracking-wider">
+                                  Saved {new Date(quote.dateSaved).toLocaleDateString()}
+                                </span>
+                                <button 
+                                  onClick={() => handleDeleteQuote(quote.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-none cursor-pointer"
+                                  title="Delete Quote"
+                                >
+                                  <Trash size={16} weight="thin" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

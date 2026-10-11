@@ -223,7 +223,7 @@ export default function LibraryDashboard({ user }) {
                   onClick={() => setFilterType(type)}
                   className={`h-9 px-5 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 inline-flex items-center justify-center ${
                     filterType === type 
-                      ? 'border-indigo bg-indigo text-background' 
+                      ? 'border-indigo bg-indigo text-white font-medium' 
                       : 'border-foreground-tertiary/20 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
                   }`}
                 >

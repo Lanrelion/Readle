@@ -4,9 +4,12 @@ import { db, deleteQuote } from '../services/db';
 import { Quotes, Trash } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
+import { useTheme } from '../hooks/useTheme';
+import { getQuoteTheme } from '../utils/quoteColors';
 import gsap from 'gsap';
 
 export default function QuotesList() {
+  const { isDark } = useTheme();
   const [selectedBookFilter, setSelectedBookFilter] = useState('all');
   const boardRef = useRef(null);
 
@@ -73,7 +76,7 @@ export default function QuotesList() {
               onClick={() => setSelectedBookFilter('all')}
               className={`px-4 py-2 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 whitespace-nowrap ${
                 selectedBookFilter === 'all'
-                  ? 'border-indigo bg-indigo text-background'
+                  ? 'border-indigo bg-indigo text-white font-medium'
                   : 'border-foreground-tertiary/30 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
               }`}
             >
@@ -85,7 +88,7 @@ export default function QuotesList() {
                 onClick={() => setSelectedBookFilter(b.id)}
                 className={`px-4 py-2 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 whitespace-nowrap ${
                   selectedBookFilter === b.id
-                    ? 'border-indigo bg-indigo text-background'
+                    ? 'border-indigo bg-indigo text-white font-medium'
                     : 'border-foreground-tertiary/30 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
                 }`}
               >
@@ -114,36 +117,39 @@ export default function QuotesList() {
           </div>
         ) : (
           <div ref={boardRef} className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-            {filteredQuotes.map((quote) => (
-              <div
-                key={quote.id}
-                className="quote-card break-inside-avoid rounded-none p-6 shadow-sm relative group transition duration-300 hover:shadow-md border border-foreground-tertiary/10 border-l-4"
-                style={{ 
-                  backgroundColor: quote.color || '#EFE9DD',
-                  borderLeftColor: quote.color === '#F5F1E8' ? '#66785F' : (quote.color === '#E3E9F1' ? '#4A5A73' : '#8A6A55')
-                }}
-              >
-                <Quotes size={20} weight="thin" className="text-foreground-tertiary/30 mb-3" />
-                <p className="text-base font-serif italic leading-relaxed text-foreground mb-4">
-                  "{quote.text}"
-                </p>
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-foreground-tertiary/10">
-                  <Link 
-                    to={`/book/${quote.bookId}`} 
-                    className="text-[11px] font-accent uppercase tracking-wider text-foreground-secondary hover:underline line-clamp-1"
-                  >
-                    {quote.bookTitle}
-                  </Link>
-                  <button 
-                    onClick={() => handleDelete(quote.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-700 border border-red-200 hover:bg-red-50 rounded-none"
-                    title="Delete Quote"
-                  >
-                    <Trash size={16} weight="thin" />
-                  </button>
+            {filteredQuotes.map((quote) => {
+              const cardTheme = getQuoteTheme(quote.color, isDark);
+              return (
+                <div
+                  key={quote.id}
+                  className="quote-card break-inside-avoid rounded-none p-6 shadow-sm relative group transition duration-300 hover:shadow-md border border-foreground-tertiary/15 border-l-4"
+                  style={{ 
+                    backgroundColor: cardTheme.backgroundColor,
+                    borderLeftColor: cardTheme.borderLeftColor,
+                  }}
+                >
+                  <Quotes size={22} weight="thin" className="text-foreground-tertiary/40 mb-3" />
+                  <p className="text-base font-serif italic leading-relaxed text-foreground mb-4">
+                    "{quote.text}"
+                  </p>
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-foreground-tertiary/15">
+                    <Link 
+                      to={`/book/${quote.bookId}`} 
+                      className="text-[11px] font-accent uppercase tracking-wider text-foreground-secondary hover:text-foreground hover:underline line-clamp-1"
+                    >
+                      {quote.bookTitle}
+                    </Link>
+                    <button 
+                      onClick={() => handleDelete(quote.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-none cursor-pointer"
+                      title="Delete Quote"
+                    >
+                      <Trash size={16} weight="thin" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
