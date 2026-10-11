@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, ArrowRight, Gear, X } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, Gear, X, SlidersHorizontal } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
 import { useTheme } from '../hooks/useTheme';
@@ -19,12 +19,32 @@ export default function EbookReader() {
   const [readingProgress, setReadingProgress] = useState({ page: 0, total: 0, percentage: 0 });
   const [isReady, setIsReady] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [fontSize, setFontSize] = useState(() => {
-    const saved = localStorage.getItem('readle-font-zoom');
+  const [fontZoom, setFontZoom] = useState(() => {
+    const saved = localStorage.getItem('readle-font-zoom') || localStorage.getItem('garder-epub-zoom');
     return saved ? parseInt(saved, 10) : 100;
+  });
+  const [useGarderFont, setUseGarderFont] = useState(() => {
+    return localStorage.getItem('garder-epub-font') !== 'original';
   });
   const [pendingQuote, setPendingQuote] = useState(null);
   const [quoteColor, setQuoteColor] = useState('#F5F1E8');
+  const [logoVisible, setLogoVisible] = useState(true);
+  const fadeTimerRef = useRef(null);
+
+  // Fade logo after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => setLogoVisible(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Restore on header tap
+  const handleHeaderTap = () => {
+    setLogoVisible(true);
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    // Re-fade after another 3 seconds
+    fadeTimerRef.current = setTimeout(() => setLogoVisible(false), 3000);
+  };
+
   const { theme } = useTheme();
 
   const bookData = useLiveQuery(() => db.books.get(id), [id]);
@@ -192,25 +212,40 @@ export default function EbookReader() {
             }
           }
         });
+
+        try {
+          const fontLink = doc.createElement('link');
+          fontLink.rel = 'stylesheet';
+          fontLink.href = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap';
+          doc.head.appendChild(fontLink);
+        } catch {
+          // Ignore if document head is unavailable
+        }
       });
 
-      // Custom quiet editorial themes injected into epub document iframe
-      rendition.themes.register('light', {
-        body: { background: '#F5F1E8', color: '#1D1B18', padding: '24px 24px 48px 24px !important', 'font-family': '"Noto Serif JP", serif' },
-        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#1D1B18 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
+      // Register and apply the Garder theme
+      rendition.themes.register('garder', {
+        'body': {
+          'font-family': '"Lora", "Georgia", serif !important',
+          'line-height': '1.8',
+          'color': '#1D1B18',
+          'background': '#F5F1E8',
+          'max-width': '680px',
+          'margin': '0 auto',
+          'padding': '0 24px',
+        },
+        'p': {
+          'margin-bottom': '1.2em',
+          'text-align': 'left',
+        },
+        'h1, h2, h3': {
+          'font-family': '"Cormorant Garamond", serif !important',
+          'font-weight': '500',
+        }
       });
-      rendition.themes.register('dark', {
-        body: { background: '#1A1813', color: '#F5F1E8', padding: '24px 24px 48px 24px !important', 'font-family': '"Noto Serif JP", serif' },
-        'p, h1, h2, h3, h4, h5, h6, li, span, div': { color: '#F5F1E8 !important', 'font-family': '"Noto Serif JP", serif !important', 'line-height': '1.8 !important' }
-      });
-      
-      rendition.themes.select(theme);
-      rendition.themes.fontSize(`${fontSize}%`);
-      try {
-        rendition.themes.override('font-size', `${fontSize}%`);
-      } catch (e) {
-        // Fallback for older epub.js versions
-      }
+
+      rendition.themes.select(useGarderFont ? 'garder' : 'default');
+      rendition.themes.fontSize(`${fontZoom}%`);
     };
     
     fileReader.readAsArrayBuffer(bookData.fileBlob);
@@ -229,21 +264,26 @@ export default function EbookReader() {
 
   // Save zoom when changed
   useEffect(() => {
-    localStorage.setItem('readle-font-zoom', fontSize.toString());
-  }, [fontSize]);
+    localStorage.setItem('readle-font-zoom', fontZoom.toString());
+  }, [fontZoom]);
 
-  // Update themes and zoom sizes reactively without tearing down the renderer
+  // Persist font preference to localStorage
   useEffect(() => {
-    if (renditionRef.current) {
-      renditionRef.current.themes.fontSize(`${fontSize}%`);
-      try {
-        renditionRef.current.themes.override('font-size', `${fontSize}%`);
-      } catch (e) {
-        // Fallback for older epub.js versions
-      }
-      renditionRef.current.themes.select(theme);
-    }
-  }, [fontSize, theme]);
+    localStorage.setItem('garder-epub-font', useGarderFont ? 'garder' : 'original');
+  }, [useGarderFont]);
+
+  // When font zoom state changes, re-apply font size to the theme
+  useEffect(() => {
+    if (!renditionRef.current) return;
+    renditionRef.current.themes.fontSize(`${fontZoom}%`);
+  }, [fontZoom]);
+
+  // When font toggle changes, re-apply theme
+  useEffect(() => {
+    if (!renditionRef.current) return;
+    renditionRef.current.themes.select(useGarderFont ? 'garder' : 'default');
+    renditionRef.current.themes.fontSize(`${fontZoom}%`);
+  }, [useGarderFont]);
 
   // Add touch swipe support
   useEffect(() => {
@@ -293,8 +333,8 @@ export default function EbookReader() {
   const next = () => renditionRef.current?.next();
   const prev = () => renditionRef.current?.prev();
 
-  const handleZoomIn = () => setFontSize(prev => Math.min(200, prev + 10));
-  const handleZoomOut = () => setFontSize(prev => Math.max(50, prev - 10));
+  const handleZoomIn = () => setFontZoom(prev => Math.min(200, prev + 10));
+  const handleZoomOut = () => setFontZoom(prev => Math.max(50, prev - 10));
 
   if (bookData === undefined) {
     return (
@@ -340,6 +380,7 @@ export default function EbookReader() {
       <PDFReader
         bookId={id}
         fileBlob={bookData.fileBlob}
+        bookTitle={bookData.title}
         onProgressUpdate={handleProgressUpdate}
       />
     );
@@ -349,28 +390,60 @@ export default function EbookReader() {
   return (
     <div className="fixed inset-0 bg-background flex flex-col text-foreground font-sans z-50">
       
-      {/* Top Header Panel (rounded-none, border-b border-foreground-tertiary/20) */}
-      <header className={`h-16 flex-shrink-0 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex justify-between items-center px-6 z-50 transition-transform duration-300 ${isReady ? 'translate-y-0' : '-translate-y-full'}`}>
-        <div className="flex items-center gap-4">
+      {/* Top Header Panel */}
+      <header 
+        onClick={handleHeaderTap}
+        className={`sticky top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex items-center justify-between px-6 z-50 flex-shrink-0 transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {/* Logo & Exit — left side */}
+        <div className="flex items-center gap-3">
           <button 
-            onClick={() => navigate(-1)} 
-            className="rounded-none p-2 hover:bg-background-secondary text-foreground-secondary hover:text-foreground transition duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(-1);
+            }} 
+            className="rounded-none p-1.5 -ml-1.5 hover:bg-background-secondary text-foreground-secondary hover:text-foreground transition duration-200"
             aria-label="Exit reader"
           >
             <X size={20} weight="thin" />
           </button>
-          <h2 className="line-clamp-1 font-serif text-sm font-normal text-foreground">
-            {bookData.title}
-          </h2>
+          <img
+            src="/logo.svg"
+            alt="Garder"
+            className="h-5 transition-opacity duration-700 select-none cursor-pointer"
+            style={{ opacity: logoVisible ? 1 : 0.25 }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              if (e.currentTarget.nextElementSibling) {
+                e.currentTarget.nextElementSibling.style.display = 'inline';
+              }
+            }}
+          />
+          {/* Fallback if no SVG */}
+          <span
+            className="text-sm font-serif font-normal text-foreground-tertiary transition-opacity duration-700 select-none hidden"
+            style={{ opacity: logoVisible ? 1 : 0.25 }}
+          >
+            garder.
+          </span>
         </div>
+
+        {/* Book title — centre */}
+        <span className="text-sm font-serif text-foreground truncate max-w-[50%] absolute left-1/2 -translate-x-1/2">
+          {bookData.title}
+        </span>
         
+        {/* Controls — right side */}
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => setShowControls(!showControls)} 
-            className={`rounded-none p-2 transition duration-200 ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
-            aria-label="Settings"
+            onClick={(e) => {
+              e.stopPropagation(); // Don't trigger header tap
+              setShowControls(!showControls);
+            }} 
+            className={`p-2 rounded-none transition duration-200 ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
+            aria-label="Reading preferences"
           >
-            <Gear size={20} weight="thin" />
+            <SlidersHorizontal size={20} weight="thin" className="text-foreground-tertiary" />
           </button>
         </div>
       </header>
@@ -378,10 +451,42 @@ export default function EbookReader() {
       {/* Floating Settings Tooltip Menu */}
       {showControls && (
         <div className="absolute right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-72">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <p className="mb-4 text-xs font-accent text-foreground-tertiary tracking-widest uppercase border-b border-foreground-tertiary/10 pb-2">
               Reading Preferences
             </p>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-sans text-foreground">Font</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setUseGarderFont(true);
+                    renditionRef.current?.themes.select('garder');
+                  }}
+                  className={`px-3 py-1 text-xs rounded-none border transition ${
+                    useGarderFont
+                      ? 'bg-indigo text-white border-indigo'
+                      : 'border-foreground-tertiary/30 text-foreground'
+                  }`}
+                >
+                  Garder
+                </button>
+                <button
+                  onClick={() => {
+                    setUseGarderFont(false);
+                    renditionRef.current?.themes.select('default');
+                  }}
+                  className={`px-3 py-1 text-xs rounded-none border transition ${
+                    !useGarderFont
+                      ? 'bg-indigo text-white border-indigo'
+                      : 'border-foreground-tertiary/30 text-foreground'
+                  }`}
+                >
+                  Original
+                </button>
+              </div>
+            </div>
             
             <div className="flex items-center justify-between">
               <span className="text-sm font-sans text-foreground">Font Zoom</span>
@@ -393,7 +498,7 @@ export default function EbookReader() {
                   −
                 </button>
                 <span className="text-sm font-sans text-foreground w-12 text-center">
-                  {fontSize}%
+                  {fontZoom}%
                 </span>
                 <button
                   onClick={handleZoomIn}
@@ -470,12 +575,12 @@ export default function EbookReader() {
       )}
 
       {/* Primary Rendition Area */}
-      <div className="flex-1 w-full bg-background flex justify-center overflow-hidden">
+      <div className="epub-reader-container flex-1 w-full bg-background flex justify-center overflow-hidden">
         <div 
           ref={viewerRef} 
           className="w-full max-w-3xl" 
           style={{ 
-            height: 'calc(100dvh - 144px)', // 100dvh - header(64px) - footer(80px)
+            height: 'calc(100dvh - 144px)', // header(64px) + footer(80px)
             overflow: 'hidden' 
           }} 
         />
@@ -484,7 +589,7 @@ export default function EbookReader() {
       {/* Navigation Arrows */}
       <button 
         onClick={prev} 
-        className="absolute bottom-20 left-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity"
+        className="absolute bottom-20 left-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity" style={{ top: '64px' }}
         aria-label="Previous Page"
       >
         <ArrowLeft size={32} weight="thin" className="text-foreground-tertiary hover:text-foreground transition-colors" />
@@ -492,7 +597,7 @@ export default function EbookReader() {
       
       <button 
         onClick={next} 
-        className="absolute bottom-20 right-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity"
+        className="absolute bottom-20 right-0 top-16 z-10 w-1/4 sm:w-20 flex items-center justify-center hover:bg-foreground/5 opacity-0 sm:opacity-100 transition-opacity" style={{ top: '64px' }}
         aria-label="Next Page"
       >
         <ArrowRight size={32} weight="thin" className="text-foreground-tertiary hover:text-foreground transition-colors" />

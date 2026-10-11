@@ -101,11 +101,15 @@ export default function QuotesList() {
             <div className="h-8 w-8 animate-spin rounded-none border-2 border-indigo border-r-transparent"></div>
           </div>
         ) : filteredQuotes.length === 0 ? (
-          <div className="flex min-h-[350px] flex-col items-center justify-center rounded-none border border-dashed border-foreground-tertiary/30 bg-background-secondary/30 text-center p-8">
-            <Quotes size={48} weight="thin" className="mb-4 text-foreground-tertiary/30" />
-            <h3 className="text-xl font-serif text-foreground-secondary">No quotes saved yet</h3>
-            <p className="mb-4 mt-2 text-sm text-foreground-tertiary max-w-sm">
-              Highlight sentences while reading digital books or add quotes from physical pages in details.
+          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center px-8">
+            <span className="text-8xl font-serif text-foreground-tertiary/15 leading-none select-none">
+              "
+            </span>
+            <h3 className="text-xl font-serif font-normal text-foreground-secondary">
+              No passages saved yet.
+            </h3>
+            <p className="text-sm text-foreground-tertiary max-w-xs leading-relaxed">
+              While reading, select any text and tap Save Quote to collect it here.
             </p>
           </div>
         ) : (
@@ -132,10 +136,10 @@ export default function QuotesList() {
                   </Link>
                   <button 
                     onClick={() => handleDelete(quote.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-vermillion hover:bg-white/40 rounded-none"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-700 border border-red-200 hover:bg-red-50 rounded-none"
                     title="Delete Quote"
                   >
-                    <Trash size={14} weight="thin" />
+                    <Trash size={16} weight="thin" />
                   </button>
                 </div>
               </div>

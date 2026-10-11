@@ -16,6 +16,16 @@ function formatRelativeTime(date) {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
+// Deterministic accent colour from title string
+function titleToColor(title) {
+  const colors = ['#66785F', '#8A6A55', '#4A5A73', '#C7A96B', '#5E574E'];
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
 function NotesTab({ book, onDelete }) {
   const [notes, setNotes] = useState(book.notes || '');
   const [saving, setSaving] = useState(false);
@@ -124,9 +134,9 @@ function NotesTab({ book, onDelete }) {
         </p>
         <button 
           onClick={onDelete}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-vermillion border border-vermillion/20 hover:bg-vermillion hover:text-background transition duration-300 rounded-none"
+          className="flex items-center gap-2 px-4 py-2 text-sm text-red-700 border border-red-200 rounded-none transition hover:bg-red-50"
         >
-          <Trash size={14} weight="thin" />
+          <Trash size={16} weight="thin" />
           Delete Volume
         </button>
       </div>
@@ -327,15 +337,20 @@ export default function BookDetail() {
       <Navigation />
 
       {/* Hero Cover Backdrop Section */}
-      <div className="relative h-96 w-full overflow-hidden bg-background-tertiary">
-        {book.cover ? (
-          <>
-            <img src={book.cover} alt="" className="w-full h-full object-cover opacity-20 blur-md scale-105" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo/5 to-background-tertiary/20" />
-        )}
+      <div className="relative h-48 w-full overflow-hidden">
+        {/* Blurred background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: book.cover ? `url(${book.cover})` : 'none',
+            backgroundColor: !book.cover ? titleToColor(book.title) : undefined,
+            filter: 'blur(20px)',
+            transform: 'scale(1.1)',
+          }}
+        />
+        <div className="absolute inset-0 bg-background/60" />
+
+        {/* Back button */}
         <div className="absolute bottom-6 left-6 lg:left-12 flex items-center gap-4 z-10">
           <button 
             onClick={() => navigate('/')}
@@ -345,10 +360,39 @@ export default function BookDetail() {
             <ArrowLeft size={20} weight="thin" />
           </button>
         </div>
+
+        {/* Floating cover — visible only on mobile (md:hidden); desktop uses sidebar */}
+        <div className="md:hidden absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-20">
+          {book.cover && book.cover !== 'null' ? (
+            <img
+              src={book.cover}
+              alt={book.title}
+              className="w-28 h-40 object-cover"
+              style={{
+                boxShadow: '0 20px 48px rgba(0,0,0,0.22)',
+                transform: 'rotate(-1deg)',
+              }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          ) : (
+            <div
+              className="w-28 h-40 flex items-center justify-center"
+              style={{
+                backgroundColor: titleToColor(book.title),
+                boxShadow: '0 20px 48px rgba(0,0,0,0.22)',
+                transform: 'rotate(-1deg)',
+              }}
+            >
+              <span className="text-white font-serif text-4xl font-normal select-none">
+                {book.title.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Details Container */}
-      <main ref={detailContainer} className="container mx-auto px-6 -mt-32 lg:-mt-48 lg:px-12 max-w-5xl relative z-20">
+      <main ref={detailContainer} className="container mx-auto px-6 md:-mt-0 mt-20 lg:px-12 max-w-5xl relative z-20 pt-4">
         <div className="flex flex-col md:flex-row gap-10 lg:gap-14">
           
           {/* Main Cover Sidebar Cover Image */}
@@ -380,7 +424,7 @@ export default function BookDetail() {
                   onClick={() => navigate(`/read/${book.id}`)}
                   className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-none bg-indigo px-6 py-3.5 text-base font-sans font-medium text-background shadow-md transition duration-300 hover:bg-clay active:scale-95"
                 >
-                  <BookOpen size={18} weight="thin" />
+                  <BookOpen size={16} weight="thin" />
                   Continue Reading
                 </button>
               ) : (
@@ -388,7 +432,7 @@ export default function BookDetail() {
                   disabled
                   className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-none bg-background-secondary/50 px-6 py-3.5 text-base font-sans font-medium text-foreground-tertiary border border-foreground-tertiary/25 cursor-not-allowed"
                 >
-                  <BookOpen size={18} weight="thin" />
+                  <BookOpen size={16} weight="thin" />
                   No File Attached
                 </button>
               )
@@ -413,25 +457,24 @@ export default function BookDetail() {
             </div>
 
             {/* Editorial Metadata Stack Grid */}
-            <div className="grid grid-cols-2 gap-6 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6">
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-foreground-tertiary mb-1 font-accent">Added On</p>
-                <p className="text-base text-foreground font-sans">{new Date(book.dateAdded).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-foreground-tertiary mb-1 font-accent">ISBN</p>
-                <p className="text-base text-foreground font-sans">{book.isbn || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-foreground-tertiary mb-1 font-accent">Total Pages</p>
-                <p className="text-base text-foreground font-sans">{book.metadata?.totalPages || 'Unknown'}</p>
-              </div>
-              {book.dateCompleted && (
-                <div>
-                  <p className="text-[11px] uppercase tracking-widest text-foreground-tertiary mb-1 font-accent">Completed On</p>
-                  <p className="text-base text-foreground font-sans">{new Date(book.dateCompleted).toLocaleDateString()}</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              {[
+                { label: 'Added', value: new Date(book.dateAdded).toLocaleDateString() },
+                { label: 'Pages', value: book.metadata?.totalPages || '—' },
+                { label: 'ISBN', value: book.isbn || '—' },
+                { label: 'Status', value: getStatusLabel(book.status) },
+                ...(book.dateCompleted ? [{ label: 'Completed', value: new Date(book.dateCompleted).toLocaleDateString() }] : []),
+                { label: 'Quotes', value: quotes?.length ?? '—' },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-accent text-foreground-tertiary tracking-widest uppercase">
+                    {label}
+                  </span>
+                  <span className="text-sm font-sans text-foreground">
+                    {value}
+                  </span>
                 </div>
-              )}
+              ))}
             </div>
 
             {/* Reading Progress Container */}
@@ -497,14 +540,14 @@ export default function BookDetail() {
                           onClick={() => setIsEditingProgress(true)}
                           className="inline-flex items-center gap-2 rounded-none border border-foreground-tertiary/30 bg-transparent px-4 py-2 text-xs font-sans font-medium text-foreground hover:bg-background transition duration-300"
                         >
-                          <PencilSimple size={14} weight="thin" />
+                          <PencilSimple size={16} weight="thin" />
                           Update Progress
                         </button>
                         <button 
                           onClick={handleMarkCompleted}
                           className="inline-flex items-center gap-2 rounded-none bg-moss px-4 py-2 text-xs font-sans font-medium text-background hover:bg-clay transition duration-300"
                         >
-                          <CheckCircle size={14} weight="thin" />
+                          <CheckCircle size={16} weight="thin" />
                           Finish Book
                         </button>
                       </div>
@@ -623,10 +666,10 @@ export default function BookDetail() {
                               </span>
                               <button 
                                 onClick={() => handleDeleteQuote(quote.id)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-vermillion hover:bg-white/40 rounded-none"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-red-700 border border-red-200 hover:bg-red-50 rounded-none"
                                 title="Delete Quote"
                               >
-                                <Trash size={14} weight="thin" />
+                                <Trash size={16} weight="thin" />
                               </button>
                             </div>
                           </div>

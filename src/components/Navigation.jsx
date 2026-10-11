@@ -47,7 +47,7 @@ export default function Navigation() {
                     : 'text-foreground hover:bg-background/50 hover:text-indigo'
                 }`}
               >
-                <Icon size={22} weight={isActive ? 'fill' : 'thin'} />
+                <Icon size={22} weight={isActive ? 'regular' : 'thin'} />
                 <span>{item.label}</span>
               </Link>
             );
@@ -79,36 +79,28 @@ export default function Navigation() {
       </nav>
 
       {/* Mobile Navigation Bottom Bar (< 1024px) */}
-      <nav className="fixed bottom-0 left-0 right-0 h-20 border-t border-foreground-tertiary/20 bg-background/95 backdrop-blur z-40 flex justify-around items-center px-4 lg:hidden">
-        {navItems.map((item, index) => {
+      <nav className="fixed bottom-0 left-0 right-0 h-16 border-t border-foreground-tertiary/20 bg-background/95 backdrop-blur z-40 flex justify-around items-center px-4 lg:hidden">
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           return (
-            <>
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={(e) => animateClick(e.currentTarget)}
-                className={`flex flex-col items-center justify-center gap-1 w-16 h-16 transition duration-300 ${
-                  isActive ? 'text-indigo' : 'text-foreground-secondary hover:text-indigo'
-                }`}
-              >
-                <Icon size={24} weight={isActive ? 'fill' : 'thin'} />
-                <span className="text-[11px] font-accent font-medium tracking-wide uppercase">
-                  {item.label}
-                </span>
-              </Link>
-              {/* Logo centered with dividers */}
-              {index === 1 && (
-                <div className="flex items-center gap-3 h-10 px-2 select-none pointer-events-none">
-                  <div className="w-px h-6 bg-foreground-tertiary/20"></div>
-                  <span className="font-serif text-lg font-normal tracking-tight text-foreground/60 leading-none">
-                    Garder
-                  </span>
-                  <div className="w-px h-6 bg-foreground-tertiary/20"></div>
-                </div>
-              )}
-            </>
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={(e) => animateClick(e.currentTarget)}
+              className={`
+                flex flex-col items-center gap-1 px-3 py-2 transition
+                ${isActive
+                  ? 'text-indigo border-t-2 border-indigo'
+                  : 'text-foreground-tertiary border-t-2 border-transparent'
+                }
+              `}
+            >
+              <Icon size={22} weight={isActive ? 'regular' : 'thin'} />
+              <span className="text-[10px] font-accent tracking-widest uppercase">
+                {item.label}
+              </span>
+            </Link>
           );
         })}
         
@@ -118,18 +110,18 @@ export default function Navigation() {
             animateClick(e.currentTarget);
             toggleTheme();
           }}
-          className="flex flex-col items-center justify-center gap-1 w-16 h-16 text-foreground-secondary hover:text-indigo transition duration-300"
+          className="flex flex-col items-center gap-1 px-3 py-2 text-foreground-tertiary border-t-2 border-transparent transition"
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? (
             <>
-              <Sun size={24} weight="thin" className="text-gold" />
-              <span className="text-[11px] font-accent font-medium tracking-wide uppercase">Light</span>
+              <Sun size={22} weight="thin" className="text-gold" />
+              <span className="text-[10px] font-accent tracking-widest uppercase">Light</span>
             </>
           ) : (
             <>
-              <Moon size={24} weight="thin" />
-              <span className="text-[11px] font-accent font-medium tracking-wide uppercase">Dark</span>
+              <Moon size={22} weight="thin" />
+              <span className="text-[10px] font-accent tracking-widest uppercase">Dark</span>
             </>
           )}
         </button>

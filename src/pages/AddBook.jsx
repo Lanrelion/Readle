@@ -17,6 +17,7 @@ export default function AddBook() {
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -284,14 +285,37 @@ export default function AddBook() {
         {/* EPUB / PDF Drag & Drop Upload Frame */}
         {entryMode === 'upload' && (
           <div 
-            className="rounded-none border border-dashed border-foreground-tertiary/40 p-14 text-center bg-background-secondary space-y-6"
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={(e) => {
+              // Only fire if leaving the dropzone entirely, not a child element
+              if (!e.currentTarget.contains(e.relatedTarget)) {
+                setIsDragging(false);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              // Synthesise a file-change event and pass to handleFileUpload
+              const file = e.dataTransfer.files[0];
+              if (file) handleFileUpload({ target: { files: [file] } });
+            }}
+            className={`
+              rounded-none border-2 border-dashed text-center transition-all duration-300 p-14 space-y-6
+              ${isDragging
+                ? 'border-indigo bg-indigo/5 scale-[1.01]'
+                : 'border-foreground-tertiary/40 bg-background-secondary scale-100'
+              }
+            `}
           >
             <div className="mx-auto flex h-16 w-16 items-center justify-center bg-indigo/10 text-indigo rounded-none">
               <UploadSimple size={32} weight="thin" />
             </div>
             <h3 className="text-xl font-serif font-normal text-foreground">Upload Manuscript</h3>
-            <p className="text-sm text-foreground-secondary max-w-sm mx-auto">
-              Drop your EPUB or PDF here or click below to parse details automatically.
+            <p className="text-sm text-foreground-secondary max-w-sm mx-auto pointer-events-none">
+              {isDragging
+                ? 'Release to add this book'
+                : 'Drop your EPUB or PDF here or click below to parse details automatically.'
+              }
             </p>
             <input 
               type="file" 
@@ -454,7 +478,7 @@ export default function AddBook() {
                 type="submit" 
                 className="inline-flex items-center justify-center gap-2 rounded-none bg-indigo px-6 py-3.5 text-sm font-sans font-medium text-background hover:bg-clay transition duration-300 disabled:opacity-50"
               >
-                <CheckCircle size={18} weight="thin" />
+                <CheckCircle size={16} weight="thin" />
                 {isLoading ? "Saving..." : "Catalog Book"}
               </button>
             </div>

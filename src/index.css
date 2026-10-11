@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Old+Mincho:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Old+Mincho:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -97,4 +97,16 @@
   .line-clamp-5 { line-clamp: 5; }
   .line-clamp-6 { line-clamp: 6; }
 }
+
+/* Hide scrollbars in reader containers */
+.epub-reader-container,
+.pdf-reader-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.epub-reader-container::-webkit-scrollbar,
+.pdf-reader-container::-webkit-scrollbar {
+  display: none;
+}
+
 

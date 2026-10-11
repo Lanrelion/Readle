@@ -1,14 +1,47 @@
-// src/components/PDFReader.jsx
 import { useState, useEffect, useRef } from 'react';
 import { loadPDF, renderPage } from '../services/pdfService';
 import { savePDFProgress, loadPDFProgress } from '../services/db';
+import { Gear, ArrowLeft, SlidersHorizontal } from '@phosphor-icons/react';
 
-export function PDFReader({ bookId, fileBlob, onProgressUpdate }) {
+export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
   const [pdf, setPdf] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [scale, setScale] = useState(1.5); // Zoom level
+  const [showControls, setShowControls] = useState(false);
+  const [logoVisible, setLogoVisible] = useState(true);
+  const fadeTimerRef = useRef(null);
+
+  // Fade logo after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => setLogoVisible(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Restore on header tap
+  const handleHeaderTap = () => {
+    setLogoVisible(true);
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    // Re-fade after another 3 seconds
+    fadeTimerRef.current = setTimeout(() => setLogoVisible(false), 3000);
+  };
+  const [contrast, setContrast] = useState(() => {
+    return parseInt(localStorage.getItem('garder-pdf-contrast') || '100');
+  });
+  const [isDarkPDF, setIsDarkPDF] = useState(() => {
+    return localStorage.getItem('garder-pdf-dark') === 'true';
+  });
+
+  // Persist
+  useEffect(() => {
+    localStorage.setItem('garder-pdf-contrast', contrast.toString());
+  }, [contrast]);
+
+  useEffect(() => {
+    localStorage.setItem('garder-pdf-dark', isDarkPDF.toString());
+  }, [isDarkPDF]);
+
   const canvasRef = useRef(null);
 
   // Keep a ref to the latest progress update callback to prevent unnecessary rendering triggers
@@ -168,23 +201,55 @@ export function PDFReader({ bookId, fileBlob, onProgressUpdate }) {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex justify-between items-center px-6 z-50">
-        <div className="flex items-center gap-4">
+      <header
+        onClick={handleHeaderTap}
+        className="fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex items-center justify-between px-6 z-50"
+      >
+        {/* Logo & Back — left side */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => window.history.back()}
-            className="p-2 hover:bg-background-secondary rounded-none transition"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.history.back();
+            }}
+            className="p-1.5 -ml-1.5 hover:bg-background-secondary rounded-none transition flex items-center text-foreground-secondary hover:text-foreground"
             aria-label="Close reader"
           >
-            ← Back
+            <ArrowLeft size={20} weight="thin" />
           </button>
-          <span className="text-sm font-serif text-foreground">
-            Page {currentPage} of {numPages}
+          <img
+            src="/logo.svg"
+            alt="Garder"
+            className="h-5 transition-opacity duration-700 select-none cursor-pointer"
+            style={{ opacity: logoVisible ? 1 : 0.25 }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              if (e.currentTarget.nextElementSibling) {
+                e.currentTarget.nextElementSibling.style.display = 'inline';
+              }
+            }}
+          />
+          {/* Fallback if no SVG */}
+          <span
+            className="text-sm font-serif font-normal text-foreground-tertiary transition-opacity duration-700 select-none hidden"
+            style={{ opacity: logoVisible ? 1 : 0.25 }}
+          >
+            garder.
           </span>
         </div>
-        
+
+        {/* Book title — centre */}
+        <span className="text-sm font-serif text-foreground truncate max-w-[50%] absolute left-1/2 -translate-x-1/2">
+          {bookTitle || `Page ${currentPage} of ${numPages}`}
+        </span>
+
+        {/* Controls — right side */}
         <div className="flex items-center gap-2">
           <button
-            onClick={zoomOut}
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomOut();
+            }}
             className="p-2 hover:bg-background-secondary rounded-none transition"
             aria-label="Zoom out"
           >
@@ -194,20 +259,86 @@ export function PDFReader({ bookId, fileBlob, onProgressUpdate }) {
             {Math.round(scale * 100)}%
           </span>
           <button
-            onClick={zoomIn}
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomIn();
+            }}
             className="p-2 hover:bg-background-secondary rounded-none transition"
             aria-label="Zoom in"
           >
             +
           </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Don't trigger header tap
+              setShowControls(!showControls);
+            }}
+            className={`p-2 rounded-none transition ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
+            aria-label="Reading preferences"
+          >
+            <SlidersHorizontal size={20} weight="thin" className="text-foreground-tertiary" />
+          </button>
         </div>
       </header>
 
+      {/* Floating Settings Tooltip Menu */}
+      {showControls && (
+        <div className="fixed right-6 top-20 z-50 rounded-none border border-foreground-tertiary/20 bg-background-secondary p-6 shadow-xl w-72">
+          <div className="space-y-4">
+            <p className="mb-4 text-xs font-accent text-foreground-tertiary tracking-widest uppercase border-b border-foreground-tertiary/10 pb-2">
+              Reading Preferences
+            </p>
+
+            {/* Contrast */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-sans text-foreground">Contrast</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setContrast(c => Math.max(c - 10, 70))}
+                  className="w-8 h-8 border border-foreground-tertiary/30 rounded-none flex items-center justify-center text-foreground hover:bg-background transition"
+                >
+                  −
+                </button>
+                <span className="text-xs text-foreground w-10 text-center">{contrast}%</span>
+                <button
+                  onClick={() => setContrast(c => Math.min(c + 10, 130))}
+                  className="w-8 h-8 border border-foreground-tertiary/30 rounded-none flex items-center justify-center text-foreground hover:bg-background transition"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Dark mode */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-sans text-foreground">Dark Page</span>
+              <button
+                onClick={() => setIsDarkPDF(d => !d)}
+                className={`px-3 py-1 text-xs rounded-none border transition ${
+                  isDarkPDF
+                    ? 'bg-indigo text-white border-indigo'
+                    : 'border-foreground-tertiary/30 text-foreground'
+                }`}
+              >
+                {isDarkPDF ? 'On' : 'Off'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PDF Canvas */}
-      <main className="flex-1 pt-20 pb-24 overflow-auto">
-        <div className="flex justify-center p-6">
+      <main className="pdf-reader-container flex-1 pt-20 pb-24 overflow-auto bg-background">
+        {/* PDF canvas wrapper */}
+        <div className="flex justify-center p-6 bg-background min-h-full">
           <canvas
             ref={canvasRef}
+            style={{
+              filter: isDarkPDF
+                ? `invert(1) contrast(${contrast}%)`
+                : `contrast(${contrast}%)`,
+              display: 'block',
+            }}
             className="shadow-lg border border-foreground-tertiary/10"
           />
         </div>

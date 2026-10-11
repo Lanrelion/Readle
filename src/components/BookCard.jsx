@@ -3,6 +3,16 @@ import { Link } from 'react-router-dom';
 import { useRef } from 'react';
 import gsap from 'gsap';
 
+// Deterministic accent colour from title string
+function titleToColor(title) {
+  const colors = ['#66785F', '#8A6A55', '#4A5A73', '#C7A96B', '#5E574E'];
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
 export default function BookCard({ book }) {
   const cardRef = useRef(null);
 
@@ -64,6 +74,14 @@ export default function BookCard({ book }) {
     return book.status === 'completed' ? 100 : 0;
   };
 
+  const isNew = () => {
+    if (!book.dateAdded) return false;
+    const daysSinceAdded = (Date.now() - new Date(book.dateAdded)) / (1000 * 60 * 60 * 24);
+    return daysSinceAdded >= 0 && daysSinceAdded <= 7;
+  };
+
+  const hasCover = book.cover && book.cover !== 'null';
+
   return (
     <div 
       ref={cardRef}
@@ -73,30 +91,60 @@ export default function BookCard({ book }) {
     >
       <Link 
         to={`/book/${book.id}`} 
-        className="group flex h-full flex-col overflow-hidden rounded-none bg-background-secondary shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] transition-shadow duration-300"
+        className="group flex h-full flex-col overflow-visible rounded-none bg-background-secondary shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] transition-shadow duration-300"
       >
         {/* Cover Image */}
-        <div className="relative aspect-[3/4] w-full overflow-hidden bg-background-tertiary/30 rounded-none">
-          {book.cover && book.cover !== 'null' && (
-            <img 
-              src={book.cover} 
-              alt={`Cover of ${book.title}`} 
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-102 absolute inset-0 z-10"
+        <div className="relative aspect-[3/4] w-full overflow-visible bg-transparent rounded-none">
+          {isNew() && (
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-gold z-20" />
+          )}
+
+          {hasCover ? (
+            <img
+              src={book.cover}
+              alt={`Cover of ${book.title}`}
+              className="w-full aspect-[3/4] object-cover transition-all duration-300"
+              style={{
+                transform: 'rotate(-1deg)',
+                boxShadow: '4px 8px 24px rgba(0,0,0,0.10)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'rotate(0deg) scale(1.02)';
+                e.currentTarget.style.boxShadow = '8px 16px 32px rgba(0,0,0,0.16)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'rotate(-1deg)';
+                e.currentTarget.style.boxShadow = '4px 8px 24px rgba(0,0,0,0.10)';
+              }}
               onError={(e) => {
-                console.error('[BookCard] Image failed to load for book:', book.title, 'Source:', book.cover ? book.cover.substring(0, 100) + '...' : 'none');
-                e.target.style.display = 'none'; // hide broken image to reveal placeholder underneath
+                e.target.style.display = 'none';
               }}
             />
+          ) : (
+            <div
+              className="w-full aspect-[3/4] flex items-center justify-center transition-all duration-300"
+              style={{
+                backgroundColor: titleToColor(book.title),
+                transform: 'rotate(-1deg)',
+                boxShadow: '4px 8px 24px rgba(0,0,0,0.10)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'rotate(0deg) scale(1.02)';
+                e.currentTarget.style.boxShadow = '8px 16px 32px rgba(0,0,0,0.16)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'rotate(-1deg)';
+                e.currentTarget.style.boxShadow = '4px 8px 24px rgba(0,0,0,0.10)';
+              }}
+            >
+              <span className="text-white font-serif text-4xl font-normal select-none">
+                {book.title.charAt(0).toUpperCase()}
+              </span>
+            </div>
           )}
           
-          {/* Always render placeholder underneath as fallback */}
-          <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-indigo/10 to-background-tertiary/40 p-4 text-center transition-transform duration-500 group-hover:scale-102 absolute inset-0 z-0">
-            <span className="text-lg font-serif font-normal text-foreground/80 line-clamp-3 leading-snug">{book.title}</span>
-            <span className="mt-2 text-[11px] font-accent text-foreground-secondary line-clamp-1">{book.author}</span>
-          </div>
-          
           {/* Status Badge Overlay */}
-          <div className="absolute right-3 top-3">
+          <div className="absolute left-3 top-3 z-10">
             <span className={`px-3 py-1 text-xs font-medium rounded-none uppercase tracking-wider ${getStatusBadgeStyle(book.status)}`}>
               {getStatusLabel(book.status)}
             </span>
@@ -117,9 +165,9 @@ export default function BookCard({ book }) {
           {/* Status & Progress */}
           <div className="mt-auto pt-2">
             <div className="flex items-center gap-2 mb-2">
-              {book.status === 'reading' && <BookOpen size={14} weight="thin" className="text-moss" />}
-              {book.status === 'completed' && <Check size={14} weight="thin" className="text-clay" />}
-              {book.status === 'wantToRead' && <Book size={14} weight="thin" className="text-foreground-tertiary" />}
+              {book.status === 'reading' && <BookOpen size={16} weight="thin" className="text-moss" />}
+              {book.status === 'completed' && <Check size={16} weight="thin" className="text-clay" />}
+              {book.status === 'wantToRead' && <Book size={16} weight="thin" className="text-foreground-tertiary" />}
               <span className="text-xs text-foreground-tertiary uppercase tracking-wider font-accent">
                 {book.type === 'ebook' ? 'Ebook' : book.type === 'pdf' ? 'PDF' : 'Physical'}
               </span>

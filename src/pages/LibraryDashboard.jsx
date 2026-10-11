@@ -182,19 +182,21 @@ export default function LibraryDashboard({ user }) {
         </header>
 
         {/* Tactical Statistics Section */}
-        <section className="grid grid-cols-3 gap-6 p-6 bg-background-secondary rounded-none border border-foreground-tertiary/10 mb-10">
-          <div className="text-center space-y-1.5 border-r border-foreground-tertiary/10">
-            <p className="text-3xl font-serif font-normal text-foreground">{stats.total}</p>
-            <p className="text-xs font-accent text-foreground-tertiary uppercase tracking-wider">Volumes Collected</p>
-          </div>
-          <div className="text-center space-y-1.5 border-r border-foreground-tertiary/10">
-            <p className="text-3xl font-serif font-normal text-moss">{stats.reading}</p>
-            <p className="text-xs font-accent text-foreground-tertiary uppercase tracking-wider">Currently Reading</p>
-          </div>
-          <div className="text-center space-y-1.5">
-            <p className="text-3xl font-serif font-normal text-clay">{stats.completed}</p>
-            <p className="text-xs font-accent text-foreground-tertiary uppercase tracking-wider">Completed</p>
-          </div>
+        <section className="grid grid-cols-3 gap-4 px-6 py-4 border-b border-foreground-tertiary/10 mb-10">
+          {[
+            { value: stats.total, label: 'Volumes' },
+            { value: stats.reading, label: 'Reading' },
+            { value: stats.completed, label: 'Finished' },
+          ].map(({ value, label }) => (
+            <div key={label} className="flex flex-col gap-1">
+              <span className="text-4xl font-serif font-normal text-foreground leading-none">
+                {value}
+              </span>
+              <span className="text-[10px] font-accent text-foreground-tertiary tracking-widest uppercase">
+                {label}
+              </span>
+            </div>
+          ))}
         </section>
 
         {/* Custom Search bar & Format Controls */}
@@ -265,11 +267,14 @@ export default function LibraryDashboard({ user }) {
                 <button
                   key={tab.value}
                   onClick={() => setFilterStatus(tab.value)}
-                  className={`text-base font-sans font-medium pb-3 transition-colors duration-300 relative rounded-none border-b-2 ${
-                    isActive 
-                      ? 'border-moss text-foreground font-semibold' 
-                      : 'border-transparent text-foreground-tertiary hover:text-foreground'
-                  }`}
+                  className={`
+                    pb-3 text-sm font-sans whitespace-nowrap transition-colors duration-300
+                    border-b-2
+                    ${isActive
+                      ? 'text-foreground border-indigo font-semibold'
+                      : 'text-foreground-tertiary border-transparent hover:text-foreground'
+                    }
+                  `}
                 >
                   {tab.label}
                 </button>
