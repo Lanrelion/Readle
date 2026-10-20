@@ -36,18 +36,10 @@ function applyEpubThemeStyles(doc, isDark, fontMode) {
     html, body {
       background-color: ${bgColor} !important;
       color: ${textColor} !important;
-      margin: 0 !important;
-      width: 100% !important;
-      max-width: none !important;
-      box-sizing: border-box !important;
-    }
-    *, *::before, *::after {
-      box-sizing: border-box !important;
     }
     body {
       ${fontRules}
       line-height: 1.8 !important;
-      padding: 0 32px !important;
       -webkit-font-smoothing: antialiased;
       overflow-wrap: break-word !important;
     }
@@ -131,7 +123,6 @@ export default function EbookReader() {
         width: '100%',
         height: '100%',
         spread: 'none',
-        manager: 'continuous',
         flow: 'paginated'
       });
       renditionRef.current = rendition;
@@ -193,6 +184,11 @@ export default function EbookReader() {
       const savedCfi = bookData.progress?.cfi || (bookData.progress?.type === 'cfi' ? bookData.progress.value : undefined);
       rendition.display(savedCfi).then(async () => {
         setIsReady(true);
+        setTimeout(() => {
+          if (renditionRef.current) {
+            renditionRef.current.resize();
+          }
+        }, 150);
         try {
           // Load quotes and apply highlights inside the reader
           const bookQuotes = await db.quotes.where('bookId').equals(id).toArray();
@@ -286,18 +282,9 @@ export default function EbookReader() {
 
       // Register a minimal theme just for epubjs internals, actual styling is via injected <style>
       rendition.themes.register('garder', {
-        'html': {
-          'margin': '0',
-          'width': '100%',
-          'max-width': 'none',
-          'box-sizing': 'border-box',
-        },
-        'body': {
-          'width': '100%',
-          'max-width': 'none',
-          'margin': '0',
-          'padding': '0 32px',
-          'box-sizing': 'border-box',
+        'p': {
+          'margin-bottom': '1.25em',
+          'text-align': 'left'
         }
       });
 
@@ -308,6 +295,17 @@ export default function EbookReader() {
     fileReader.readAsArrayBuffer(bookData.fileBlob);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookData?.fileBlob]);
+
+  // Handle window resize to keep columns perfectly aligned
+  useEffect(() => {
+    const handleResize = () => {
+      if (renditionRef.current) {
+        renditionRef.current.resize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Clean up ePub on unmount
   useEffect(() => {
@@ -455,12 +453,24 @@ export default function EbookReader() {
   }
 
 
+  const readerBg = effectiveDarkEpub ? '#151413' : '#F5F1E8';
+  const readerText = effectiveDarkEpub ? '#EDE8DF' : '#1D1B18';
+  const readerBorder = effectiveDarkEpub ? 'rgba(237, 232, 223, 0.12)' : 'rgba(29, 27, 24, 0.12)';
+  const readerHeaderBg = effectiveDarkEpub ? 'rgba(21, 20, 19, 0.95)' : 'rgba(245, 241, 232, 0.95)';
+
   return (
-    <div className="fixed inset-0 bg-background flex flex-col text-foreground font-sans z-50">
+    <div 
+      className="fixed inset-0 flex flex-col font-sans z-50 transition-colors duration-300"
+      style={{ backgroundColor: readerBg, color: readerText }}
+    >
       
       {/* Top Header Panel */}
       <header 
-        className={`sticky top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex items-center justify-between px-6 z-50 flex-shrink-0 transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+        className={`sticky top-0 left-0 right-0 h-16 border-b flex items-center justify-between px-6 z-50 flex-shrink-0 transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+        style={{
+          backgroundColor: readerHeaderBg,
+          borderColor: readerBorder
+        }}
       >
         {/* Logo & Exit — left side */}
         <div className="flex items-center gap-3">
@@ -469,7 +479,8 @@ export default function EbookReader() {
               e.stopPropagation();
               navigate(-1);
             }} 
-            className="rounded-none p-1.5 -ml-1.5 hover:bg-background-secondary text-foreground-secondary hover:text-foreground transition duration-200"
+            className="rounded-none p-1.5 -ml-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition duration-200"
+            style={{ color: readerText }}
             aria-label="Exit reader"
           >
             <X size={20} weight="thin" />
@@ -478,18 +489,24 @@ export default function EbookReader() {
             <img
               src="/logo.svg"
               alt="Garder"
-              className={`h-5 transition duration-300 select-none cursor-pointer ${isDark ? 'invert brightness-200 contrast-125' : ''}`}
+              className={`h-5 transition duration-300 select-none cursor-pointer ${effectiveDarkEpub ? 'invert brightness-200 contrast-125' : ''}`}
               onError={() => setLogoError(true)}
             />
           ) : (
-            <span className="text-base font-serif font-semibold tracking-tight text-foreground select-none">
+            <span 
+              className="text-base font-serif font-semibold tracking-tight select-none"
+              style={{ color: readerText }}
+            >
               garder.
             </span>
           )}
         </div>
 
         {/* Book title — centre */}
-        <span className="text-sm font-serif text-foreground truncate max-w-[50%] absolute left-1/2 -translate-x-1/2">
+        <span 
+          className="text-sm font-serif truncate max-w-[50%] absolute left-1/2 -translate-x-1/2"
+          style={{ color: readerText }}
+        >
           {bookData.title}
         </span>
         
@@ -497,13 +514,14 @@ export default function EbookReader() {
         <div className="flex items-center gap-2">
           <button 
             onClick={(e) => {
-              e.stopPropagation(); // Don't trigger header tap
+              e.stopPropagation();
               setShowControls(!showControls);
             }} 
-            className={`p-2 rounded-none transition duration-200 ${showControls ? 'bg-background-secondary text-indigo' : 'hover:bg-background-secondary text-foreground-secondary hover:text-foreground'}`}
+            className="p-2 rounded-none transition duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: showControls ? '#4f46e5' : readerText }}
             aria-label="Reading preferences"
           >
-            <SlidersHorizontal size={20} weight="thin" className={showControls ? 'text-indigo' : 'text-foreground-tertiary'} />
+            <SlidersHorizontal size={20} weight="thin" className={showControls ? 'text-indigo' : 'opacity-70'} />
           </button>
         </div>
       </header>
@@ -670,12 +688,12 @@ export default function EbookReader() {
 
       {/* Primary Rendition Area */}
       <div 
-        className="epub-reader-container flex-1 w-full flex justify-center overflow-hidden transition-colors duration-300"
-        style={{ backgroundColor: effectiveDarkEpub ? '#151413' : '#F5F1E8' }}
+        className="epub-reader-container flex-1 w-full flex justify-center items-center overflow-hidden transition-colors duration-300 px-4 sm:px-8"
+        style={{ backgroundColor: readerBg }}
       >
         <div 
           ref={viewerRef} 
-          className="w-full max-w-3xl" 
+          className="w-full max-w-2xl h-full flex items-center justify-center" 
           style={{ 
             height: 'calc(100dvh - 144px)', // header(64px) + footer(80px)
             overflow: 'hidden' 
@@ -701,11 +719,20 @@ export default function EbookReader() {
       </button>
 
       {/* Bottom Progress Controls Panel */}
-      <div className="h-20 flex-shrink-0 bg-background/95 backdrop-blur border-t border-foreground-tertiary/20 flex flex-col gap-3 p-4 z-50 justify-center">
+      <div 
+        className="h-20 flex-shrink-0 border-t flex flex-col gap-3 p-4 z-50 justify-center transition-colors duration-300"
+        style={{
+          backgroundColor: readerHeaderBg,
+          borderColor: readerBorder
+        }}
+      >
         <div className="w-full h-1 bg-foreground-tertiary/20 rounded-full overflow-hidden">
           <div className="h-full bg-moss transition-all duration-300" style={{ width: `${readingProgress.percentage}%` }} />
         </div>
-        <div className="flex justify-between items-center text-[11px] font-accent uppercase tracking-widest text-foreground-tertiary">
+        <div 
+          className="flex justify-between items-center text-[11px] font-accent uppercase tracking-widest opacity-70"
+          style={{ color: readerText }}
+        >
           <span>{readingProgress.total > 0 ? `Est. Page ${readingProgress.page} of ${readingProgress.total}` : 'Chapter Progress'}</span>
           <span>{readingProgress.percentage}%</span>
         </div>
