@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, ArrowRight, Gear, X, SlidersHorizontal } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, X, SlidersHorizontal } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
 import { useTheme } from '../hooks/useTheme';
@@ -36,14 +36,20 @@ function applyEpubThemeStyles(doc, isDark, fontMode) {
     html, body {
       background-color: ${bgColor} !important;
       color: ${textColor} !important;
+      margin: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      box-sizing: border-box !important;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box !important;
     }
     body {
       ${fontRules}
       line-height: 1.8 !important;
-      max-width: 680px !important;
-      margin: 0 auto !important;
-      padding: 0 24px !important;
+      padding: 0 32px !important;
       -webkit-font-smoothing: antialiased;
+      overflow-wrap: break-word !important;
     }
     p, span, div, li, blockquote, dd, dt, article, section, em, strong, i, b {
       color: ${textColor} !important;
@@ -63,6 +69,10 @@ function applyEpubThemeStyles(doc, isDark, fontMode) {
     }
     a {
       color: ${linkColor} !important;
+    }
+    img, svg, video {
+      max-width: 100% !important;
+      height: auto !important;
     }
   `;
 }
@@ -290,10 +300,18 @@ export default function EbookReader() {
 
       // Register a minimal theme just for epubjs internals, actual styling is via injected <style>
       rendition.themes.register('garder', {
+        'html': {
+          'margin': '0',
+          'width': '100%',
+          'max-width': 'none',
+          'box-sizing': 'border-box',
+        },
         'body': {
-          'max-width': '680px',
-          'margin': '0 auto',
-          'padding': '0 24px',
+          'width': '100%',
+          'max-width': 'none',
+          'margin': '0',
+          'padding': '0 32px',
+          'box-sizing': 'border-box',
         }
       });
 
@@ -424,7 +442,7 @@ export default function EbookReader() {
 
   // Render PDF reader
   if (isPDF) {
-    const handleProgressUpdate = async (currentPage, totalPages, percentage) => {
+    const handleProgressUpdate = async (currentPage, totalPages) => {
       const updateData = {
         status: currentPage === totalPages ? 'completed' : 'reading',
         progress: {

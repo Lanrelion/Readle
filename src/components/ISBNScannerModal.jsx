@@ -22,7 +22,7 @@ export function ISBNScannerModal({ isOpen, onClose, onScan }) {
         scanner.clear();
         onScan(decodedText);
       },
-      (error) => {
+      () => {
         // Ignore normal scan failures (happens every frame when no barcode is found)
       }
     );

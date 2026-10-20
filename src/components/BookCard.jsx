@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useRef } from 'react';
 import gsap from 'gsap';
 
+const NEW_BOOK_REFERENCE_TIME = Date.now();
+
 // Deterministic accent colour from title string
 function titleToColor(title) {
   const colors = ['#66785F', '#8A6A55', '#4A5A73', '#C7A96B', '#5E574E'];
@@ -76,7 +78,7 @@ export default function BookCard({ book }) {
 
   const isNew = () => {
     if (!book.dateAdded) return false;
-    const daysSinceAdded = (Date.now() - new Date(book.dateAdded)) / (1000 * 60 * 60 * 24);
+    const daysSinceAdded = (NEW_BOOK_REFERENCE_TIME - new Date(book.dateAdded)) / (1000 * 60 * 60 * 24);
     return daysSinceAdded >= 0 && daysSinceAdded <= 7;
   };
 

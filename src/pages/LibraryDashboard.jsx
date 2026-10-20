@@ -5,7 +5,6 @@ import { db } from '../services/db';
 import BookCard from '../components/BookCard';
 import Navigation from '../components/Navigation';
 import gsap from 'gsap';
-import { supabase } from '../services/supabase';
 import { AuthModal } from '../components/AuthModal';
 
 export default function LibraryDashboard({ user }) {

@@ -1,5 +1,4 @@
 import Dexie from 'dexie';
-import { supabase } from './supabase';
 
 export const db = new Dexie('BookTrackDB');
 
@@ -29,7 +28,7 @@ if (navigator.storage && navigator.storage.persist) {
     if (granted) {
       console.log('[DB] Persistent storage granted — data will not be auto-evicted');
     } else {
-      console.warn('[DB] Persistent storage denied — data may be evicted under storage pressure');
+      console.info('[DB] Persistent storage denied; using browser-managed IndexedDB storage');
     }
   });
 }

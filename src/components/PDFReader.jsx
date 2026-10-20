@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { loadPDF, renderPage } from '../services/pdfService';
 import { savePDFProgress, loadPDFProgress } from '../services/db';
-import { Gear, ArrowLeft, SlidersHorizontal } from '@phosphor-icons/react';
+import { ArrowLeft, SlidersHorizontal } from '@phosphor-icons/react';
 import { useTheme } from '../hooks/useTheme';
 
 export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {

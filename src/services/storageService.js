@@ -18,7 +18,7 @@ export async function uploadBookFile(userId, bookId, fileBlob) {
     const filePath = `${userId}/${bookId}`;
     
     // We use upsert so that if the file already exists, we replace it.
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(filePath, fileBlob, {
         cacheControl: '3600',

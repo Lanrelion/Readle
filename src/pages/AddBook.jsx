@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, UploadSimple, Camera, Barcode } from '@phosphor-icons/react';
+import { CheckCircle, UploadSimple, Barcode } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
 import Navigation from '../components/Navigation';
