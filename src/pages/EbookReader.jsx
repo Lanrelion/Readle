@@ -99,22 +99,8 @@ export default function EbookReader() {
   });
   const [pendingQuote, setPendingQuote] = useState(null);
   const [quoteColor, setQuoteColor] = useState('#F5F1E8');
-  const [logoVisible, setLogoVisible] = useState(true);
-  const fadeTimerRef = useRef(null);
+  const [logoError, setLogoError] = useState(false);
 
-  // Fade logo after 3 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => setLogoVisible(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Restore on header tap
-  const handleHeaderTap = () => {
-    setLogoVisible(true);
-    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
-    // Re-fade after another 3 seconds
-    fadeTimerRef.current = setTimeout(() => setLogoVisible(false), 3000);
-  };
 
   const { isDark } = useTheme();
   const effectiveDarkEpub = readerThemeMode === 'auto' ? isDark : readerThemeMode === 'dark';
@@ -474,7 +460,6 @@ export default function EbookReader() {
       
       {/* Top Header Panel */}
       <header 
-        onClick={handleHeaderTap}
         className={`sticky top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur border-b border-foreground-tertiary/20 flex items-center justify-between px-6 z-50 flex-shrink-0 transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
       >
         {/* Logo & Exit — left side */}
@@ -489,25 +474,18 @@ export default function EbookReader() {
           >
             <X size={20} weight="thin" />
           </button>
-          <img
-            src="/logo.svg"
-            alt="Garder"
-            className={`h-5 transition-opacity duration-700 select-none cursor-pointer ${isDark ? 'invert brightness-200' : ''}`}
-            style={{ opacity: logoVisible ? 1 : 0.25 }}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              if (e.currentTarget.nextElementSibling) {
-                e.currentTarget.nextElementSibling.style.display = 'inline';
-              }
-            }}
-          />
-          {/* Fallback if no SVG */}
-          <span
-            className="text-sm font-serif font-normal text-foreground-secondary transition-opacity duration-700 select-none hidden"
-            style={{ opacity: logoVisible ? 1 : 0.25 }}
-          >
-            garder.
-          </span>
+          {!logoError ? (
+            <img
+              src="/logo.svg"
+              alt="Garder"
+              className={`h-5 transition duration-300 select-none cursor-pointer ${isDark ? 'invert brightness-200 contrast-125' : ''}`}
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <span className="text-base font-serif font-semibold tracking-tight text-foreground select-none">
+              garder.
+            </span>
+          )}
         </div>
 
         {/* Book title — centre */}
