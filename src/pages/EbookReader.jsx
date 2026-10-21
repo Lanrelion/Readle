@@ -504,7 +504,7 @@ export default function EbookReader() {
 
         {/* Book title — centre */}
         <span 
-          className="text-sm font-serif truncate max-w-[50%] absolute left-1/2 -translate-x-1/2"
+          className="text-sm font-serif truncate max-w-[36%] sm:max-w-[50%] absolute left-1/2 -translate-x-1/2 text-center pointer-events-none"
           style={{ color: readerText }}
         >
           {bookData.title}

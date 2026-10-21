@@ -220,7 +220,7 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
         </div>
 
         {/* Book title — centre */}
-        <span className="text-sm font-serif text-foreground truncate max-w-[50%] absolute left-1/2 -translate-x-1/2">
+        <span className="text-sm font-serif text-foreground truncate max-w-[36%] sm:max-w-[50%] absolute left-1/2 -translate-x-1/2 text-center pointer-events-none">
           {bookTitle || `Page ${currentPage} of ${numPages}`}
         </span>
 

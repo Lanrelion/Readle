@@ -22,7 +22,14 @@ export default function Navigation() {
 
   return (
     <>
-
+      {/* Mobile Top Bar Logo (< 1024px) */}
+      <div className="lg:hidden flex items-center justify-center pt-6 pb-0">
+        <Link to="/" className="hover:opacity-80 transition-opacity flex items-center justify-center">
+          <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
+            Garder
+          </span>
+        </Link>
+      </div>
 
       {/* Desktop Navigation Sidebar (>= 1024px) */}
       <nav className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-foreground-tertiary/20 bg-background-secondary p-6 z-40 lg:flex">
