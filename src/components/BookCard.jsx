@@ -2,18 +2,9 @@ import { Book, BookOpen, Check } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import { useRef } from 'react';
 import gsap from 'gsap';
+import { titleToColor } from '../utils/colorUtils';
 
 const NEW_BOOK_REFERENCE_TIME = Date.now();
-
-// Deterministic accent colour from title string
-function titleToColor(title) {
-  const colors = ['#66785F', '#8A6A55', '#4A5A73', '#C7A96B', '#5E574E'];
-  let hash = 0;
-  for (let i = 0; i < title.length; i++) {
-    hash = title.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
 
 export default function BookCard({ book }) {
   const cardRef = useRef(null);

@@ -1,12 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Plus, Quotes, Sun, Moon, Desktop } from '@phosphor-icons/react';
-import { useTheme } from '../hooks/useTheme';
-
+import { Books, PlusCircle, Compass, Quotes } from '@phosphor-icons/react';
 import gsap from 'gsap';
 
 export default function Navigation() {
   const location = useLocation();
-  const { theme, mode, toggleTheme } = useTheme();
 
   const animateClick = (element) => {
     gsap.timeline()
@@ -15,8 +12,9 @@ export default function Navigation() {
   };
 
   const navItems = [
-    { path: '/', label: 'Library', icon: BookOpen },
-    { path: '/add', label: 'Add Book', icon: Plus },
+    { path: '/', label: 'Library', icon: Books },
+    { path: '/add', label: 'Add Book', icon: PlusCircle },
+    { path: '/explore', label: 'Explore', icon: Compass },
     { path: '/quotes', label: 'Quotes', icon: Quotes },
   ];
 
@@ -34,9 +32,11 @@ export default function Navigation() {
       {/* Desktop Navigation Sidebar (>= 1024px) */}
       <nav className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-foreground-tertiary/20 bg-background-secondary p-6 z-40 lg:flex">
         <div className="mb-10 flex items-center justify-center">
-          <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
-            Garder
-          </span>
+          <Link to="/" className="hover:opacity-80 transition-opacity">
+            <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
+              Garder
+            </span>
+          </Link>
         </div>
 
         <div className="flex flex-1 flex-col gap-2">
@@ -59,40 +59,6 @@ export default function Navigation() {
               </Link>
             );
           })}
-        </div>
-
-        {/* Theme Controller at the bottom */}
-        <div className="mt-auto border-t border-foreground-tertiary/20 pt-6">
-          <button
-            onClick={(e) => {
-              animateClick(e.currentTarget);
-              toggleTheme();
-            }}
-            className="flex w-full items-center gap-4 px-4 py-3 font-sans text-base font-normal text-foreground hover:bg-background/50 hover:text-indigo rounded-none transition duration-300"
-            title={`Current theme: ${mode === 'system' ? `Device (${theme})` : mode}. Click to change.`}
-          >
-            {mode === 'system' ? (
-              <>
-                <Desktop size={22} weight="thin" className="text-indigo" />
-                <div className="flex items-baseline gap-2">
-                  <span>Device</span>
-                  <span className="text-[10px] font-accent uppercase tracking-widest text-foreground-tertiary">
-                    Auto
-                  </span>
-                </div>
-              </>
-            ) : mode === 'dark' ? (
-              <>
-                <Moon size={22} weight="thin" className="text-gold" />
-                <span>Dark Mode</span>
-              </>
-            ) : (
-              <>
-                <Sun size={22} weight="thin" className="text-amber-600" />
-                <span>Light Mode</span>
-              </>
-            )}
-          </button>
         </div>
       </nav>
 
@@ -121,34 +87,6 @@ export default function Navigation() {
             </Link>
           );
         })}
-        
-        {/* Toggle Theme Mobile Button */}
-        <button
-          onClick={(e) => {
-            animateClick(e.currentTarget);
-            toggleTheme();
-          }}
-          className="flex flex-col items-center gap-1 px-3 py-2 text-foreground-tertiary border-t-2 border-transparent transition"
-          aria-label="Toggle theme"
-          title={`Theme: ${mode === 'system' ? 'Device' : mode}`}
-        >
-          {mode === 'system' ? (
-            <>
-              <Desktop size={22} weight="thin" className="text-indigo" />
-              <span className="text-[10px] font-accent tracking-widest uppercase">Auto</span>
-            </>
-          ) : mode === 'dark' ? (
-            <>
-              <Moon size={22} weight="thin" className="text-gold" />
-              <span className="text-[10px] font-accent tracking-widest uppercase">Dark</span>
-            </>
-          ) : (
-            <>
-              <Sun size={22} weight="thin" className="text-amber-600" />
-              <span className="text-[10px] font-accent tracking-widest uppercase">Light</span>
-            </>
-          )}
-        </button>
       </nav>
     </>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { X, CloudArrowUp, SignOut, EnvelopeSimple, Lock } from '@phosphor-icons/react';
 
@@ -293,6 +294,10 @@ export function AuthModal({ isOpen, onClose }) {
 
             <p className="text-[10px] text-foreground-tertiary leading-relaxed max-w-xs mx-auto text-center">
               We respect your privacy. We only access your email address to authenticate your sync bucket.
+            </p>
+
+            <p className="text-xs text-foreground-tertiary text-center">
+              By signing in you agree to the <Link to="/terms" onClick={() => onClose?.()} className="underline hover:text-foreground">Terms</Link>.
             </p>
           </div>
         )}

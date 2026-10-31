@@ -5,6 +5,8 @@ import AddBook from './pages/AddBook';
 import BookDetail from './pages/BookDetail';
 import EbookReader from './pages/EbookReader';
 import QuotesList from './pages/QuotesList';
+import { Terms } from './pages/Terms';
+import { ExplorePage } from './pages/ExplorePage';
 import { useTheme } from './hooks/useTheme';
 import { OfflineBanner } from './components/OfflineBanner';
 import { AuthModal } from './components/AuthModal';
@@ -79,7 +81,7 @@ function App() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         const sessionUser = session?.user || null;
         setUser(sessionUser);
         
@@ -91,15 +93,21 @@ function App() {
         }
 
         if (event === 'SIGNED_IN' && session) {
-          // Update last seen
-          await updateLastSeen(session.user.id);
-          
-          // Get profile
-          const profile = await getProfile(session.user.id);
-          console.log('[App] User profile:', profile);
-          
-          // Run full sync
-          await fullSync();
+          setTimeout(async () => {
+            try {
+              // Update last seen
+              await updateLastSeen(session.user.id);
+              
+              // Get profile
+              const profile = await getProfile(session.user.id);
+              console.log('[App] User profile:', profile);
+              
+              // Run full sync
+              await fullSync();
+            } catch (err) {
+              console.warn('[App] Deferred auth actions failed:', err);
+            }
+          }, 0);
         }
       }
     );
@@ -172,7 +180,9 @@ function App() {
           <Route path="/add" element={<AddBook />} />
           <Route path="/book/:id" element={<BookDetail />} />
           <Route path="/read/:id" element={<EbookReader />} />
+          <Route path="/explore" element={<ExplorePage />} />
           <Route path="/quotes" element={<QuotesList />} />
+          <Route path="/terms" element={<Terms />} />
         </Routes>
       </Router>
     </>

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Books, MagnifyingGlass } from '@phosphor-icons/react';
+import { Books, MagnifyingGlass, Sun, Moon } from '@phosphor-icons/react';
+import { useTheme } from '../hooks/useTheme';
 import { db } from '../services/db';
 import BookCard from '../components/BookCard';
 import Navigation from '../components/Navigation';
@@ -8,11 +9,13 @@ import gsap from 'gsap';
 import { AuthModal } from '../components/AuthModal';
 
 export default function LibraryDashboard({ user }) {
+  const { isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('statusFilter') || 'all');
   const [filterType, setFilterType] = useState(() => localStorage.getItem('formatFilter') || 'all');
   const [dateFilter, setDateFilter] = useState(() => localStorage.getItem('dateFilter') || 'all');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [activeTagFilter, setActiveTagFilter] = useState(null);
   const dashboardRef = useRef(null);
 
   // Entrance animation for dashboard elements
@@ -118,6 +121,23 @@ export default function LibraryDashboard({ user }) {
     [] // Default value before loading
   );
 
+  // Collect all unique tags across the library
+  const allTags = useMemo(() => {
+    const tagSet = new Set();
+    (books || []).forEach(book => {
+      (book.tags || []).forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [books]);
+
+  // Further filter by active tag
+  const filteredBooks = useMemo(() => {
+    if (!activeTagFilter || !books) return books;
+    return books.filter(book =>
+      (book.tags || []).includes(activeTagFilter)
+    );
+  }, [books, activeTagFilter]);
+
   const stats = {
     total: books?.length || 0,
     reading: books?.filter(b => b.status === 'reading').length || 0,
@@ -161,6 +181,14 @@ export default function LibraryDashboard({ user }) {
             <span className="text-xs font-accent uppercase tracking-widest text-foreground-tertiary">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleTheme}
+                className="p-2 text-foreground-tertiary hover:text-foreground transition cursor-pointer"
+                aria-label="Toggle dark mode"
+              >
+                {isDark ? <Sun size={20} weight="thin" /> : <Moon size={20} weight="thin" />}
+              </button>
               {(!user && localStorage.getItem('skippedAuth') === 'true') ? null : (
                 <button
                   onClick={() => setShowAuthModal(true)}
@@ -169,6 +197,7 @@ export default function LibraryDashboard({ user }) {
                   {user ? 'Account' : 'Sign In to Sync'}
                 </button>
               )}
+            </div>
           </div>
           
           <h1 className="text-5xl font-serif font-normal text-foreground leading-tight">
@@ -282,12 +311,45 @@ export default function LibraryDashboard({ user }) {
           </div>
         </div>
 
+        {/* Tag filter row — only shown when books have tags */}
+        {allTags.length > 0 && (
+          <div className="flex gap-2 px-0 overflow-x-auto pb-3 mb-5 scrollbar-hide">
+            <button
+              onClick={() => setActiveTagFilter(null)}
+              className={`
+                flex-shrink-0 px-3 py-1 text-xs font-sans rounded-none border transition
+                ${!activeTagFilter
+                  ? 'bg-indigo text-white border-indigo'
+                  : 'border-foreground-tertiary/30 text-foreground-tertiary hover:border-foreground-tertiary'
+                }
+              `}
+            >
+              All
+            </button>
+            {allTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                className={`
+                  flex-shrink-0 px-3 py-1 text-xs font-sans rounded-none border transition capitalize
+                  ${activeTagFilter === tag
+                    ? 'bg-moss text-white border-moss'
+                    : 'border-foreground-tertiary/30 text-foreground-tertiary hover:border-moss hover:text-moss'
+                  }
+                `}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Main Grid View */}
         {books === undefined ? (
           <div className="flex min-h-[300px] items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-none border-2 border-indigo border-r-transparent"></div>
           </div>
-        ) : books.length === 0 ? (
+        ) : filteredBooks?.length === 0 ? (
           <div className="flex min-h-[350px] flex-col items-center justify-center rounded-none border border-dashed border-foreground-tertiary/30 bg-background-secondary/30 text-center p-8">
             <Books size={48} weight="thin" className="mb-4 text-foreground-tertiary/40" />
             <h3 className="text-xl font-serif text-foreground-secondary">Your shelf awaits its first story.</h3>
@@ -297,7 +359,7 @@ export default function LibraryDashboard({ user }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5">
-            {books.map(book => (
+            {filteredBooks?.map(book => (
               <BookCard key={book.id} book={book} />
             ))}
           </div>

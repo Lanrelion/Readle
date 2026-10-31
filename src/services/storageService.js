@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { MAX_CLOUD_FILE_MB } from '../utils/fileLimits';
 
 const BUCKET_NAME = 'book_files';
 
@@ -9,10 +10,15 @@ const BUCKET_NAME = 'book_files';
  * @param {string} userId - The user's Supabase auth ID.
  * @param {string} bookId - The unique book ID.
  * @param {Blob} fileBlob - The actual EPUB or PDF file.
- * @returns {Promise<string|null>} - The public/signed URL or null if failed.
+ * @returns {Promise<string|{skipped: boolean}|null>} - The public/signed URL or null if failed.
  */
 export async function uploadBookFile(userId, bookId, fileBlob) {
   if (!userId || !bookId || !fileBlob) return null;
+
+  if (fileBlob.size > MAX_CLOUD_FILE_MB * 1024 * 1024) {
+    console.log('[Storage] File over cloud limit, keeping local only:', fileBlob.size);
+    return { skipped: true };
+  }
 
   try {
     const filePath = `${userId}/${bookId}`;

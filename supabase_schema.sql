@@ -132,3 +132,107 @@ create trigger ebook_progress_updated_at
   before update on ebook_progress
   for each row
   execute function update_updated_at();
+
+
+-- ==============================================================================
+-- Profiles table and auth hooks
+-- ==============================================================================
+
+-- Create profiles table
+CREATE TABLE IF NOT EXISTS profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text,
+  full_name text,
+  avatar_url text,
+  created_at timestamptz DEFAULT now(),
+  last_seen_at timestamptz DEFAULT now(),
+  total_books integer DEFAULT 0,
+  total_quotes integer DEFAULT 0
+);
+
+-- Enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own profile
+CREATE POLICY "Users can view own profile"
+  ON profiles FOR SELECT
+  USING (auth.uid() = id);
+
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE
+  USING (auth.uid() = id);
+
+-- Allow profile creation on signup
+CREATE POLICY "Enable insert for authenticated users"
+  ON profiles FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+-- Auto-create profile on new user signup (trigger)
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'avatar_url'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Attach trigger to auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Backfill existing auth users into profiles table
+INSERT INTO profiles (id, email, full_name, avatar_url, created_at)
+SELECT
+  id,
+  email,
+  raw_user_meta_data->>'full_name',
+  raw_user_meta_data->>'avatar_url',
+  created_at
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ==============================================================================
+-- Storage Bucket Limits (25MB cap on book_files)
+-- ==============================================================================
+UPDATE storage.buckets
+SET file_size_limit = 26214400   -- 25MB in bytes
+WHERE id = 'book_files';
+
+
+-- ==============================================================================
+-- Explore Books Public Aggregation View
+-- Security: Does NOT expose user_id, auth.users, or any user metadata.
+-- Only public aggregated reading counts, titles, authors, covers, and tags.
+-- ==============================================================================
+
+ALTER TABLE public.books
+  ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
+
+CREATE OR REPLACE VIEW public.explore_books WITH (security_invoker = false) AS
+SELECT
+  min(title) AS title,
+  min(author) AS author,
+  max(cover) AS cover,
+  COALESCE(
+    (
+      SELECT array_agg(DISTINCT t)
+      FROM unnest(array_agg(tags)) AS t
+      WHERE t IS NOT NULL AND t <> ''
+    ),
+    '{}'::text[]
+  ) AS tags,
+  count(DISTINCT user_id)::integer AS reader_count
+FROM public.books
+GROUP BY lower(trim(title)), lower(trim(author));
+
+GRANT SELECT ON public.explore_books TO anon, authenticated;

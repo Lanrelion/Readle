@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { checkFileSize } from '../utils/fileLimits';
 import { CheckCircle, UploadSimple, Barcode } from '@phosphor-icons/react';
 import { db } from '../services/db';
 import ePub from 'epubjs';
@@ -9,10 +10,13 @@ import { loadPDF, getPDFMetadata } from '../services/pdfService';
 import { ISBNScannerModal } from '../components/ISBNScannerModal';
 import { syncLocalToCloud } from '../services/syncService';
 import { supabase } from '../services/supabase';
+import { TagInput } from '../components/TagInput';
 
 export default function AddBook() {
   const navigate = useNavigate();
   const [entryMode, setEntryMode] = useState('manual');
+  const [fileError, setFileError] = useState(null);
+  const [fileNotice, setFileNotice] = useState(null);
   const [fileBlob, setFileBlob] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -28,6 +32,8 @@ export default function AddBook() {
     totalPages: '',
     cover: null
   });
+
+  const [tags, setTags] = useState([]);
 
   const pageContainer = useRef(null);
   const fileInputRef = useRef(null);
@@ -136,6 +142,19 @@ export default function AddBook() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setFileError(null);
+    setFileNotice(null);
+
+    const sizeCheck = checkFileSize(file);
+    if (!sizeCheck.ok) {
+      setFileError(sizeCheck.message);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    if (!sizeCheck.cloud) {
+      setFileNotice(sizeCheck.message);
+    }
+
     setIsLoading(true);
     try {
       const isPDFFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -213,6 +232,7 @@ export default function AddBook() {
           : { type: 'pages', value: `0/${formData.totalPages || '?'}` },
         fileBlob: fileBlob,
         updatedAt: new Date().toISOString(),
+        tags: tags,
         synced: 0
       };
       
@@ -282,56 +302,74 @@ export default function AddBook() {
           </button>
         </div>
 
+        {/* Notices and Errors */}
+        {fileError && (
+          <div className="mb-6 p-4 bg-vermillion/10 border border-vermillion/25 text-vermillion text-xs font-sans">
+            {fileError}
+          </div>
+        )}
+        {fileNotice && (
+          <div className="mb-6 p-4 bg-moss/10 border border-moss/25 text-moss text-xs font-sans">
+            {fileNotice}
+          </div>
+        )}
+
         {/* EPUB / PDF Drag & Drop Upload Frame */}
         {entryMode === 'upload' && (
-          <div 
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={(e) => {
-              // Only fire if leaving the dropzone entirely, not a child element
-              if (!e.currentTarget.contains(e.relatedTarget)) {
+          <div>
+            <div 
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={(e) => {
+                // Only fire if leaving the dropzone entirely, not a child element
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                  setIsDragging(false);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
                 setIsDragging(false);
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-              // Synthesise a file-change event and pass to handleFileUpload
-              const file = e.dataTransfer.files[0];
-              if (file) handleFileUpload({ target: { files: [file] } });
-            }}
-            className={`
-              rounded-none border-2 border-dashed text-center transition-all duration-300 p-14 space-y-6
-              ${isDragging
-                ? 'border-indigo bg-indigo/5 scale-[1.01]'
-                : 'border-foreground-tertiary/40 bg-background-secondary scale-100'
-              }
-            `}
-          >
-            <div className="mx-auto flex h-16 w-16 items-center justify-center bg-indigo/10 text-indigo rounded-none">
-              <UploadSimple size={32} weight="thin" />
-            </div>
-            <h3 className="text-xl font-serif font-normal text-foreground">Upload Manuscript</h3>
-            <p className="text-sm text-foreground-secondary max-w-sm mx-auto pointer-events-none">
-              {isDragging
-                ? 'Release to add this book'
-                : 'Drop your EPUB or PDF here or click below to parse details automatically.'
-              }
-            </p>
-            <input 
-              type="file" 
-              accept=".epub,.pdf"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-            <button 
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              className="inline-flex items-center justify-center rounded-none bg-indigo px-6 py-3.5 text-sm font-sans font-medium text-background hover:bg-clay transition duration-300 disabled:opacity-50"
+                // Synthesise a file-change event and pass to handleFileUpload
+                const file = e.dataTransfer.files[0];
+                if (file) handleFileUpload({ target: { files: [file] } });
+              }}
+              className={`
+                rounded-none border-2 border-dashed text-center transition-all duration-300 p-14 space-y-6
+                ${isDragging
+                  ? 'border-indigo bg-indigo/5 scale-[1.01]'
+                  : 'border-foreground-tertiary/40 bg-background-secondary scale-100'
+                }
+              `}
             >
-              {isLoading ? "Parsing Manuscript..." : "Select Manuscript"}
-            </button>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center bg-indigo/10 text-indigo rounded-none">
+                <UploadSimple size={32} weight="thin" />
+              </div>
+              <h3 className="text-xl font-serif font-normal text-foreground">Upload Manuscript</h3>
+              <p className="text-sm text-foreground-secondary max-w-sm mx-auto pointer-events-none">
+                {isDragging
+                  ? 'Release to add this book'
+                  : 'Drop your EPUB or PDF here or click below to parse details automatically.'
+                }
+              </p>
+              <input 
+                type="file" 
+                accept=".epub,.pdf"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <button 
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="inline-flex items-center justify-center rounded-none bg-indigo px-6 py-3.5 text-sm font-sans font-medium text-background hover:bg-clay transition duration-300 disabled:opacity-50"
+              >
+                {isLoading ? "Parsing Manuscript..." : "Select Manuscript"}
+              </button>
+            </div>
+            <p className="text-xs text-foreground-tertiary mt-3 text-center">
+              Only upload files you have the right to use. Your files stay private to your account.{' '}
+              <Link to="/terms" className="underline hover:text-foreground">Terms</Link>
+            </p>
           </div>
         )}
 
@@ -469,6 +507,14 @@ export default function AddBook() {
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* Categories / Tag Input */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-foreground">
+                Categories
+              </label>
+              <TagInput tags={tags} onChange={setTags} />
             </div>
 
             {/* Save Button with custom Phosphor Icon */}

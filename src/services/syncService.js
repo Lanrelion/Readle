@@ -73,11 +73,15 @@ export async function syncLocalToCloud() {
 
         // Upload file to Supabase Storage if local fileBlob exists but no file_url is present
         let fileUrl = book.file_url || null; // Might be undefined on older records
-        if (book.fileBlob && !fileUrl) {
+        let fileSkipped = book.file_skipped || false;
+        if (book.fileBlob && !fileUrl && !fileSkipped) {
           console.log(`[Sync] Uploading file for book ${book.id}...`);
-          const uploadedUrl = await uploadBookFile(userId, book.id, book.fileBlob);
-          if (uploadedUrl) {
-            fileUrl = uploadedUrl;
+          const uploadResult = await uploadBookFile(userId, book.id, book.fileBlob);
+          if (typeof uploadResult === 'string') {
+            fileUrl = uploadResult;
+          } else if (uploadResult?.skipped) {
+            console.log(`[Sync] Book ${book.id} file skipped (exceeds cloud limit), keeping local only`);
+            fileSkipped = true;
           }
         }
 
@@ -96,6 +100,7 @@ export async function syncLocalToCloud() {
           file_url: fileUrl,
           metadata: book.metadata || null,
           notes: book.notes || null, // Add notes field
+          tags: book.tags || [],     // Add tags field
           // [Bug 4] Include updated_at so cloud and local timestamps stay aligned
           updated_at: book.updatedAt || new Date().toISOString(),
         };
@@ -113,7 +118,7 @@ export async function syncLocalToCloud() {
         }
         
         // Mark as synced locally and update file_url
-        await db.books.update(book.id, { synced: 1, file_url: fileUrl });
+        await db.books.update(book.id, { synced: 1, file_url: fileUrl, file_skipped: fileSkipped });
         uploaded++;
         console.log('[Sync] ✓ Synced book:', book.title);
       } catch (error) {
@@ -269,6 +274,7 @@ export async function syncCloudToLocal() {
             file_url: book.file_url,
             metadata: book.metadata,
             notes: book.notes,
+            tags: book.tags || [],
             updatedAt: book.updated_at,
             synced: 1,
             fileBlob: downloadedBlob // Will be Blob or null
@@ -302,6 +308,7 @@ export async function syncCloudToLocal() {
               file_url: book.file_url,
               metadata: book.metadata,
               notes: book.notes,
+              tags: book.tags || [],
               updatedAt: book.updated_at,
               synced: 1,
               fileBlob: downloadedBlob

@@ -8,6 +8,8 @@ import { fullSync } from '../services/syncService';
 import { supabase } from '../services/supabase';
 import { useTheme } from '../hooks/useTheme';
 import { getQuoteTheme } from '../utils/quoteColors';
+import { TagInput } from '../components/TagInput';
+import { titleToColor } from '../utils/colorUtils';
 import gsap from 'gsap';
 
 // Helper
@@ -18,15 +20,7 @@ function formatRelativeTime(date) {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
-// Deterministic accent colour from title string
-function titleToColor(title) {
-  const colors = ['#66785F', '#8A6A55', '#4A5A73', '#C7A96B', '#5E574E'];
-  let hash = 0;
-  for (let i = 0; i < title.length; i++) {
-    hash = title.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
+
 
 function NotesTab({ book, onDelete }) {
   const [notes, setNotes] = useState(book.notes || '');
@@ -35,6 +29,11 @@ function NotesTab({ book, onDelete }) {
   const saveTimerRef = useRef(null);
   const isEditingRef = useRef(false);
 
+  // Tags state — initialised from book record
+  const [tags, setTags] = useState(book.tags || []);
+  const [tagsSaved, setTagsSaved] = useState(false);
+  const isFirstTagRender = useRef(true);
+
   // Sync notes from book prop when not actively editing
   // (e.g. if notes were updated from another device/tab)
   useEffect(() => {
@@ -42,6 +41,49 @@ function NotesTab({ book, onDelete }) {
       setNotes(book.notes || '');
     }
   }, [book.notes]);
+
+  // Auto-save tags when they change (debounced, skip initial mount)
+  useEffect(() => {
+    if (!book?.id) return;
+    if (isFirstTagRender.current) {
+      isFirstTagRender.current = false;
+      return;
+    }
+
+    const saveTags = async () => {
+      console.log('[Tags] saveTags fired', tags);
+      try {
+        await db.books.update(book.id, { tags });
+
+        console.log('[Tags] before getSession');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[Tags] after getSession, session:', !!session);
+        if (!session) {
+          console.log('[Tags] No session, saved locally only');
+        }
+        let cloudOk = false;
+        if (session) {
+          const { error, count } = await supabase
+            .from('books')
+            .update({ tags }, { count: 'exact' })
+            .eq('id', book.id);
+
+          cloudOk = !error && count > 0;
+          if (error) console.error('[Tags] Cloud save failed:', error);
+          else if (count === 0) console.warn('[Tags] No cloud row matched. Book not synced yet, or RLS blocked it.');
+          else console.log('[Tags] Saved to cloud');
+        }
+
+        if (!session || cloudOk) setTagsSaved(true);
+        setTimeout(() => setTagsSaved(false), 2000);
+      } catch (e) {
+        console.error('[Tags] Save failed:', e);
+      }
+    };
+
+    const timer = setTimeout(saveTags, 800);
+    return () => clearTimeout(timer);
+  }, [tags, book.id]);
 
   // Auto-save notes 1.5 seconds after user stops typing
   const handleNotesChange = (e) => {
@@ -100,6 +142,19 @@ function NotesTab({ book, onDelete }) {
 
   return (
     <div className="space-y-4 text-foreground-secondary font-sans leading-relaxed text-sm">
+      {/* Categories / Tags */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
+            Categories
+          </label>
+          {tagsSaved && (
+            <span className="text-xs text-moss">Saved</span>
+          )}
+        </div>
+        <TagInput tags={tags} onChange={setTags} />
+      </div>
+
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
           Personal Notes
