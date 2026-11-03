@@ -167,25 +167,23 @@ function App() {
   }
 
   return (
-    <>
+    <Router>
       <OfflineBanner />
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
-      <Router>
-        <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<LibraryDashboard user={user} />} />
-          <Route path="/add" element={<AddBook />} />
-          <Route path="/book/:id" element={<BookDetail />} />
-          <Route path="/read/:id" element={<EbookReader />} />
-          <Route path="/explore" element={<ExplorePage />} />
-          <Route path="/quotes" element={<QuotesList />} />
-          <Route path="/terms" element={<Terms />} />
-        </Routes>
-      </Router>
-    </>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<LibraryDashboard user={user} />} />
+        <Route path="/add" element={<AddBook />} />
+        <Route path="/book/:id" element={<BookDetail />} />
+        <Route path="/read/:id" element={<EbookReader />} />
+        <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/quotes" element={<QuotesList />} />
+        <Route path="/terms" element={<Terms />} />
+      </Routes>
+    </Router>
   );
 }
 
