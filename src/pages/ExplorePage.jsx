@@ -15,6 +15,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildShelves } from '../utils/buildShelves';
 import { HOVER_IN_MS, HOVER_OUT_MS, SETTLE_MS } from '../components/explore/focusConfig';
 import { FocusLayer } from '../components/explore/FocusLayer';
+import { Link } from 'react-router-dom';
 
 function GhostSpines({ count }) {
   return Array.from({ length: count }, (_, index) => (
@@ -76,11 +77,13 @@ export function ExplorePage() {
       const { data, error } = await supabase
         .from('explore_books')
         .select('*')
+        .order('recommendation_count', { ascending: false })
+        .order('last_recommended', { ascending: false })
         .limit(50);
 
       if (error) throw error;
       setFocus(null);
-      setBooks(data || []);
+      setBooks((data || []).filter((book) => book.title?.trim() && book.author?.trim()));
       setIsOnline(true);
     } catch (error) {
       console.error('[Explore] Failed to load:', error);
@@ -220,6 +223,10 @@ export function ExplorePage() {
           cover: book.cover && book.cover !== 'null' ? book.cover : null,
           tags: book.tags || [],
           status: 'wantToRead',
+          recommended: false,
+          recommendedAt: null,
+          recommendedSyncedAt: null,
+          recommendPrompted: false,
           progress: null,
           dateAdded: new Date().toISOString(),
           dateCompleted: null,
@@ -256,7 +263,7 @@ export function ExplorePage() {
       featured: featuredBooks,
       rest: remainingBooks,
       shelves: buildShelves(remainingBooks),
-      ledgeLabel: Math.max(0, ...all.map((book) => book.reader_count || 0)) > 1 ? 'Most read' : 'Newly shelved',
+      ledgeLabel: Math.max(0, ...all.map((book) => book.recommendation_count || 0)) > 1 ? 'Most recommended' : 'Newly recommended',
     };
   }, [books, activeTag]);
 
@@ -378,10 +385,10 @@ export function ExplorePage() {
         {/* Header */}
         <header className="flex flex-col gap-3 py-6 border-b border-foreground-tertiary/10 mb-8">
           <h1 className="text-4xl lg:text-5xl font-serif font-normal text-foreground leading-tight">
-            What readers are into
+            Recommended by readers
           </h1>
           <p className="text-sm text-foreground-secondary max-w-md">
-            Books other Garder readers are working through.
+            Books Garder readers finished and want to pass on. No names, just titles.
           </p>
         </header>
 
@@ -461,9 +468,11 @@ export function ExplorePage() {
             )}
             {!loading && isOnline && visible.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none">
-                <p className="font-serif text-lg text-foreground-secondary">
-                  Nothing on the shelves yet. Be the first to add a book.
-                </p>
+                <p className="font-serif text-lg text-foreground-secondary">No recommendations yet.</p>
+                <p className="mt-2 text-sm text-foreground-secondary">Finish a book and recommend it. It will appear here.</p>
+                <Link to="/" className="pointer-events-auto mt-4 inline-flex border border-foreground-tertiary/30 px-4 py-2 text-sm text-foreground hover:bg-background-secondary">
+                  Go to your library
+                </Link>
               </div>
             )}
           </div>

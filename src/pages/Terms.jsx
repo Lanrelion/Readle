@@ -18,6 +18,15 @@ export function Terms() {
 
       <section className="space-y-2 mb-8">
         <h2 className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
+          Recommendations
+        </h2>
+        <p className="text-sm text-foreground leading-relaxed">
+          If you recommend a book, its title and author are visible to other readers, with a count of how many readers recommended it. Your name and account are never shown. You can withdraw a recommendation at any time. It is removed from Explore once you are online.
+        </p>
+      </section>
+
+      <section className="space-y-2 mb-8">
+        <h2 className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
           Your files
         </h2>
         <p className="text-sm text-foreground leading-relaxed">

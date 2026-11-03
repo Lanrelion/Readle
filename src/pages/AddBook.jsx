@@ -11,6 +11,7 @@ import { ISBNScannerModal } from '../components/ISBNScannerModal';
 import { syncLocalToCloud } from '../services/syncService';
 import { supabase } from '../services/supabase';
 import { TagInput } from '../components/TagInput';
+import { recommendPatchForStatus } from '../utils/recommend';
 
 export default function AddBook() {
   const navigate = useNavigate();
@@ -223,6 +224,11 @@ export default function AddBook() {
         isbn: formData.isbn,
         type: formData.type,
         status: formData.status,
+        ...recommendPatchForStatus(formData.status),
+        recommended: false,
+        recommendedAt: null,
+        recommendedSyncedAt: null,
+        recommendPrompted: false,
         cover: formData.cover,
         dateAdded: new Date().toISOString(),
         dateCompleted: formData.status === 'completed' ? new Date().toISOString() : null,

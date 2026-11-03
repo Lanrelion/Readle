@@ -1,6 +1,7 @@
 import { useRef, useLayoutEffect } from 'react';
 import { gsap, prefersReducedMotion } from '../../utils/gsapSetup';
 import { CoverFace } from './CoverFace';
+import { RecSeal } from './RecSeal';
 import { CARD_H, CARD_W, HOVER_IN_MS, HOVER_OUT_MS, USE_3D_TURN } from './focusConfig';
 
 export function FaceOut({ book, index = 0, onOpen, innerRef, reduce = false }) {
@@ -66,7 +67,7 @@ export function FaceOut({ book, index = 0, onOpen, innerRef, reduce = false }) {
       ref={ref}
       className="faceout"
       style={{ '--card-w': `${CARD_W}px`, '--card-h': `${CARD_H}px` }}
-      aria-label={`${book.title} by ${book.author}`}
+      aria-label={`${book.title} by ${book.author}, recommended by ${book.recommendation_count} ${book.recommendation_count === 1 ? 'reader' : 'readers'}`}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
       onFocus={handlePointerEnter}
@@ -74,6 +75,7 @@ export function FaceOut({ book, index = 0, onOpen, innerRef, reduce = false }) {
       onClick={(e) => onOpen?.(book, e.currentTarget.getBoundingClientRect())}
     >
       <CoverFace book={book} />
+      <RecSeal count={Number(book.recommendation_count) || 0} variant="cover" />
     </button>
   );
 }

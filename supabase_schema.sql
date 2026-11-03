@@ -12,6 +12,8 @@ create table books (
   status text not null check (status in ('wantToRead', 'reading', 'completed')),
   cover text, -- Base64 or URL
   progress jsonb, -- {type: 'pages', value: '45/300'}
+  recommended boolean NOT NULL DEFAULT false,
+  recommended_at timestamptz,
   date_added timestamptz default now(),
   date_completed timestamptz,
   file_url text, -- For ebook files (Supabase Storage)
@@ -212,17 +214,50 @@ WHERE id = 'book_files';
 -- ==============================================================================
 -- Explore Books Public Aggregation View
 -- Security: Does NOT expose user_id, auth.users, or any user metadata.
--- Only public aggregated reading counts, titles, authors, covers, and tags.
+-- Only public aggregated recommendation counts, titles, authors, covers, and tags.
 -- ==============================================================================
 
 ALTER TABLE public.books
   ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
 
+ALTER TABLE public.books
+  ADD COLUMN IF NOT EXISTS recommended boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS recommended_at timestamptz;
+
+CREATE TABLE IF NOT EXISTS public.explore_blocklist (
+  book_key text PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.explore_blocklist ADD COLUMN IF NOT EXISTS book_key text;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'explore_blocklist' AND column_name = 'key'
+  ) THEN
+    EXECUTE 'UPDATE public.explore_blocklist SET book_key = "key" WHERE book_key IS NULL';
+  END IF;
+END $$;
+ALTER TABLE public.explore_blocklist ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'explore_books' AND column_name = 'reader_count'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'explore_books' AND column_name = 'recommendation_count'
+  ) THEN
+    ALTER VIEW public.explore_books RENAME COLUMN reader_count TO recommendation_count;
+  END IF;
+END $$;
+
 CREATE OR REPLACE VIEW public.explore_books WITH (security_invoker = false) AS
 SELECT
   min(title) AS title,
   min(author) AS author,
-  max(cover) AS cover,
+  max(nullif(nullif(btrim(cover), ''), 'null')) AS cover,
   COALESCE(
     (
       SELECT array_agg(DISTINCT t)
@@ -231,8 +266,19 @@ SELECT
     ),
     '{}'::text[]
   ) AS tags,
-  count(DISTINCT user_id)::integer AS reader_count
+  count(DISTINCT user_id)::integer AS recommendation_count,
+  max(recommended_at) AS last_recommended
 FROM public.books
+WHERE type IN ('ebook', 'physical')
+  AND status = 'completed'
+  AND recommended = true
+  AND nullif(btrim(title), '') IS NOT NULL
+  AND nullif(btrim(author), '') IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.explore_blocklist AS blocked
+    WHERE blocked.book_key = lower(trim(public.books.title)) || '|' || lower(trim(public.books.author))
+  )
 GROUP BY lower(trim(title)), lower(trim(author));
 
 GRANT SELECT ON public.explore_books TO anon, authenticated;

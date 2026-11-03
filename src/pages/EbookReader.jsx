@@ -6,7 +6,8 @@ import { db } from '../services/db';
 import ePub from 'epubjs';
 import { useTheme } from '../hooks/useTheme';
 import { PDFReader } from '../components/PDFReader';
-import { syncLocalToCloud } from '../services/syncService';
+import { pushBook, syncLocalToCloud } from '../services/syncService';
+import { recommendPatchForStatus } from '../utils/recommend';
 
 
 
@@ -128,7 +129,8 @@ export default function EbookReader() {
       renditionRef.current = rendition;
 
       // Update progress using chapter spine index mapping
-      const updateProgress = (loc) => {
+      const updateProgress = async (loc) => {
+        const currentBook = await db.books.get(id) || bookData;
         
         let percentage = null;
         let page = 0;
@@ -148,37 +150,39 @@ export default function EbookReader() {
           updatedAt: new Date().toISOString(),
           synced: 0
         };
-        if (bookData.status !== 'completed') {
+        if (currentBook.status !== 'completed') {
           updateData.status = 'reading';
+          Object.assign(updateData, recommendPatchForStatus('reading'));
         }
         
         if (percentage !== null) {
           updateData.progress = { 
             type: 'percentage', 
-            value: bookData.status === 'completed' ? (bookData.progress?.value || 100) : percentage, 
+            value: currentBook.status === 'completed' ? (currentBook.progress?.value || 100) : percentage,
             cfi: loc.start.cfi 
           };
         } else {
           updateData.progress = {
-            ...(bookData.progress || {}),
+            ...(currentBook.progress || {}),
             cfi: loc.start.cfi
           };
         }
 
-        db.books.update(id, updateData).then(() => {
-          // Also update the dedicated ebookProgress store for syncService
-          db.ebookProgress.put({
-            id: `${id}-progress`,
-            bookId: id,
-            currentPage: page,
-            totalPages: total,
-            percentageRead: percentage || 0,
-            lastReadDate: new Date().toISOString(),
-            synced: 0
-          }).then(() => {
-            syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
-          });
+        await db.books.update(id, updateData);
+        if (updateData.status && updateData.status !== currentBook.status) {
+          await pushBook({ ...currentBook, ...updateData });
+        }
+        // Also update the dedicated ebookProgress store for syncService.
+        await db.ebookProgress.put({
+          id: `${id}-progress`,
+          bookId: id,
+          currentPage: page,
+          totalPages: total,
+          percentageRead: percentage || 0,
+          lastReadDate: new Date().toISOString(),
+          synced: 0
         });
+        syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
       };
 
       const savedCfi = bookData.progress?.cfi || (bookData.progress?.type === 'cfi' ? bookData.progress.value : undefined);
@@ -427,8 +431,11 @@ export default function EbookReader() {
   // Render PDF reader
   if (isPDF) {
     const handleProgressUpdate = async (currentPage, totalPages) => {
+      const currentBook = await db.books.get(id) || bookData;
+      const newStatus = currentPage === totalPages ? 'completed' : 'reading';
       const updateData = {
-        status: currentPage === totalPages ? 'completed' : 'reading',
+        status: newStatus,
+        ...recommendPatchForStatus(newStatus),
         progress: {
           type: 'pages',
           value: `${currentPage}/${totalPages}`,
@@ -439,6 +446,9 @@ export default function EbookReader() {
         synced: 0
       };
       await db.books.update(id, updateData);
+      if (newStatus !== currentBook.status) {
+        await pushBook({ ...currentBook, ...updateData });
+      }
       syncLocalToCloud().catch(err => console.warn('[Sync] Progress sync failed:', err));
     };
 

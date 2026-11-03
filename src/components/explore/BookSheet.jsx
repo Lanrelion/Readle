@@ -220,12 +220,12 @@ export function BookSheet({ book, originRect, saved, onSave, onClose }) {
               {book.author}
             </p>
 
-            {(book.reader_count > 0) && (
+            {(book.recommendation_count > 0) && (
               <p
                 className="sheet-line"
                 style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--foreground-tertiary)', margin: 0 }}
               >
-                {book.reader_count} {book.reader_count === 1 ? 'reader' : 'readers'}
+                Recommended by {book.recommendation_count} {book.recommendation_count === 1 ? 'reader' : 'readers'}
               </p>
             )}
 

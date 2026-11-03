@@ -7,6 +7,58 @@ import { uploadBookFile, downloadBookFile, deleteBookFile } from './storageServi
 // Prevents concurrent fullSync() calls from racing against each other.
 let isSyncing = false;
 
+export function toCloudBook(book, userId) {
+  const cloudCover = (book.cover && book.cover.startsWith('data:')) ? null : (book.cover || null);
+  const isRecommended = !!book.recommended
+    && book.status === 'completed'
+    && book.type !== 'pdf'
+    && !!book.title?.trim()
+    && !!book.author?.trim();
+
+  return {
+    id: book.id,
+    user_id: userId,
+    type: book.type,
+    title: book.title,
+    author: book.author,
+    isbn: book.isbn || null,
+    status: book.status,
+    cover: cloudCover,
+    progress: book.progress || null,
+    date_added: book.dateAdded,
+    date_completed: book.dateCompleted || null,
+    file_url: book.file_url || null,
+    metadata: book.metadata || null,
+    notes: book.notes || null,
+    tags: book.tags || [],
+    recommended: isRecommended,
+    recommended_at: isRecommended ? (book.recommendedAt || new Date().toISOString()) : null,
+    updated_at: book.updatedAt || new Date().toISOString(),
+  };
+}
+
+export async function pushBook(book) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { ok: false, reason: 'signed_out' };
+
+    const { error } = await supabase
+      .from('books')
+      .upsert(toCloudBook(book, session.user.id), { onConflict: 'id' });
+    if (error) throw error;
+
+    const local = await db.books.get(book.id);
+    if (local && (!book.updatedAt || local.updatedAt === book.updatedAt)) {
+      const fileSyncPending = !!local.fileBlob && !local.file_url && !local.file_skipped;
+      await db.books.update(book.id, { synced: fileSyncPending ? 0 : 1 });
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error('[Sync] pushBook failed:', error);
+    return { ok: false, reason: 'error' };
+  }
+}
+
 /**
  * Sync deletions to Supabase
  */
@@ -67,10 +119,6 @@ export async function syncLocalToCloud() {
     
     for (const book of localBooks) {
       try {
-        // [Bug 3] Strip base64 covers — they can be enormous and cause upsert timeouts.
-        // Cloud should only store URL covers; local IndexedDB retains the full cover.
-        const cloudCover = (book.cover && book.cover.startsWith('data:')) ? null : (book.cover || null);
-
         // Upload file to Supabase Storage if local fileBlob exists but no file_url is present
         let fileUrl = book.file_url || null; // Might be undefined on older records
         let fileSkipped = book.file_skipped || false;
@@ -85,25 +133,7 @@ export async function syncLocalToCloud() {
           }
         }
 
-        const bookData = {
-          id: book.id,
-          user_id: userId,
-          type: book.type,
-          title: book.title,
-          author: book.author,
-          isbn: book.isbn || null,
-          status: book.status,
-          cover: cloudCover,
-          progress: book.progress || null,
-          date_added: book.dateAdded,
-          date_completed: book.dateCompleted || null,
-          file_url: fileUrl,
-          metadata: book.metadata || null,
-          notes: book.notes || null, // Add notes field
-          tags: book.tags || [],     // Add tags field
-          // [Bug 4] Include updated_at so cloud and local timestamps stay aligned
-          updated_at: book.updatedAt || new Date().toISOString(),
-        };
+        const bookData = toCloudBook({ ...book, file_url: fileUrl }, userId);
 
         const { error } = await supabase.from('books').upsert(bookData, { onConflict: 'id' });
         if (error) {
@@ -118,7 +148,11 @@ export async function syncLocalToCloud() {
         }
         
         // Mark as synced locally and update file_url
-        await db.books.update(book.id, { synced: 1, file_url: fileUrl, file_skipped: fileSkipped });
+        const syncedPatch = { synced: 1, file_url: fileUrl, file_skipped: fileSkipped };
+        if (bookData.recommended) {
+          syncedPatch.recommendedSyncedAt = new Date().toISOString();
+        }
+        await db.books.update(book.id, syncedPatch);
         uploaded++;
         console.log('[Sync] ✓ Synced book:', book.title);
       } catch (error) {
@@ -275,6 +309,10 @@ export async function syncCloudToLocal() {
             metadata: book.metadata,
             notes: book.notes,
             tags: book.tags || [],
+            recommended: !!book.recommended,
+            recommendedAt: book.recommended_at || null,
+            recommendedSyncedAt: book.recommended ? new Date().toISOString() : null,
+            recommendPrompted: false,
             updatedAt: book.updated_at,
             synced: 1,
             fileBlob: downloadedBlob // Will be Blob or null
@@ -309,6 +347,11 @@ export async function syncCloudToLocal() {
               metadata: book.metadata,
               notes: book.notes,
               tags: book.tags || [],
+              recommended: !!book.recommended,
+              recommendedAt: book.recommended_at || null,
+              recommendedSyncedAt: book.recommended
+                ? (local.recommendedSyncedAt || new Date().toISOString())
+                : null,
               updatedAt: book.updated_at,
               synced: 1,
               fileBlob: downloadedBlob

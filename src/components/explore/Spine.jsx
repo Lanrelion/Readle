@@ -1,9 +1,11 @@
 import { memo, useRef } from 'react';
+import { RecSeal } from './RecSeal';
 
 export const Spine = memo(function Spine({ book, saved, isFocused, onEnter, onLeave, onKeyFocus, onActivate }) {
   const slotRef = useRef(null);
   const { art } = book;
-  const label = `${book.title} by ${book.author}, ${book.reader_count} ${book.reader_count === 1 ? 'reader' : 'readers'}`;
+  const count = Number(book.recommendation_count) || 0;
+  const label = `${book.title} by ${book.author}, recommended by ${count} ${count === 1 ? 'reader' : 'readers'}`;
 
   const onKeyDown = (event) => {
     const next = event.key === 'ArrowRight'
@@ -33,6 +35,7 @@ export const Spine = memo(function Spine({ book, saved, isFocused, onEnter, onLe
       onClick={() => onActivate(book, slotRef.current)}
     >
       <span className={`spine-wrap${art.leans ? ' leans' : ''}`}>
+        <RecSeal count={count} />
         <span
           className="spine"
           style={{ width: art.width, height: `calc(var(--s) * ${art.height}px)`, background: art.color, color: art.ink }}
@@ -43,7 +46,6 @@ export const Spine = memo(function Spine({ book, saved, isFocused, onEnter, onLe
           <span className="spine-title" aria-hidden="true">{book.title}</span>
           {art.width >= 46 && <span className="spine-author" aria-hidden="true">{book.author}</span>}
         </span>
-        {book.reader_count >= 2 && <i className="ribbon" aria-hidden="true" />}
         {saved && <i className="saved-dot" aria-hidden="true" />}
       </span>
     </button>

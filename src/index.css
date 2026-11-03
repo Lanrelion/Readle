@@ -199,8 +199,14 @@
   border-top: 1px solid rgba(255,255,255,.5); border-bottom: 1px solid rgba(255,255,255,.5); opacity: .5; }
 .spine .diamond { position: absolute; top: 6px; left: 50%; width: 7px; height: 7px; margin-left: -3.5px;
   transform: rotate(45deg); background: #C7A96B; opacity: .8; }
-.ribbon { position: absolute; top: -9px; left: 50%; width: 6px; height: 16px; margin-left: -3px; background: #C7A96B;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%); }
+.rec-seal { position: absolute; z-index: 3; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+  box-sizing: border-box; width: 34px; height: 22px; padding: 0 2px; border: 1px solid rgba(29,27,24,.72); border-radius: 11px;
+  background: #C7A96B; color: #1D1B18; font: 700 9px/1 var(--font-sans); white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(20,16,12,.42); font-style: normal; }
+.rec-seal__star { width: 9px; height: 9px; flex: none; }
+.rec-seal--spine { top: -13px; left: 50%; transform: translateX(-50%); }
+.rec-seal--cover { top: -11px; right: 8px; }
+.rec-seal--chip { top: -12px; left: 12px; }
 .saved-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-moss); z-index: 2; }
 
 /* Display ledge for face-out books */

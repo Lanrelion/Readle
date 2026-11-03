@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { CaretRight } from '@phosphor-icons/react';
 import { gsap, prefersReducedMotion } from '../../utils/gsapSetup';
 import { CoverFace } from './CoverFace';
+import { RecSeal } from './RecSeal';
 import { CARD_W, CARD_H, CHIP_W, CHIP_GAP, USE_3D_TURN } from './focusConfig';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
@@ -110,6 +111,7 @@ export function FocusLayer({ roomRef, focus, mode, onOpen, onHold, onRelease }) 
         <button ref={chipRef} tabIndex={-1} className="focus-chip" onClick={(event) => open(event.currentTarget)} {...hold}>
           <span className="chip-title">{book.title}</span>
           <span className="chip-author">{book.author}<CaretRight size={10} weight="thin" /></span>
+          <RecSeal count={Number(book.recommendation_count) || 0} variant="chip" />
         </button>
       </div>
     </div>

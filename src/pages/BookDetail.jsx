@@ -4,12 +4,15 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Trash, PencilSimple, CheckCircle, BookOpen } from '@phosphor-icons/react';
 import { db, deleteBook, deleteQuote, saveBookProgress } from '../services/db';
 import Navigation from '../components/Navigation';
-import { fullSync } from '../services/syncService';
+import { fullSync, pushBook } from '../services/syncService';
 import { supabase } from '../services/supabase';
 import { useTheme } from '../hooks/useTheme';
 import { getQuoteTheme } from '../utils/quoteColors';
 import { TagInput } from '../components/TagInput';
 import { titleToColor } from '../utils/colorUtils';
+import { canRecommend, recommendPatchForStatus } from '../utils/recommend';
+import RecommendPrompt from '../components/RecommendPrompt';
+import RecommendSection from '../components/RecommendSection';
 import gsap from 'gsap';
 
 // Helper
@@ -155,6 +158,8 @@ function NotesTab({ book, onDelete }) {
         <TagInput tags={tags} onChange={setTags} />
       </div>
 
+      <RecommendSection book={book} />
+
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
           Personal Notes
@@ -212,6 +217,7 @@ export default function BookDetail() {
   const [quoteText, setQuoteText] = useState('');
   const [quoteColor, setQuoteColor] = useState('#F5F1E8'); // Default Rice Paper
   const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'quotes' | 'chapters'
+  const [showRecommendPrompt, setShowRecommendPrompt] = useState(false);
 
   const detailContainer = useRef(null);
   const bookCover = useRef(null);
@@ -303,8 +309,9 @@ export default function BookDetail() {
     
     const completedValue = currentProgressType === 'percentage' ? 100 : `${book.metadata?.totalPages || '?'}/${book.metadata?.totalPages || '?'}`;
     
-    await db.books.update(id, {
+    const statusUpdate = {
       status: 'completed',
+      ...recommendPatchForStatus('completed'),
       dateCompleted: new Date().toISOString(),
       progress: { 
         ...book.progress,
@@ -313,7 +320,9 @@ export default function BookDetail() {
       },
       updatedAt: new Date().toISOString(),
       synced: 0
-    });
+    };
+    await db.books.update(id, statusUpdate);
+    await pushBook({ ...book, ...statusUpdate });
 
     // [Bug 13] Also write to ebookProgress table so it syncs to Supabase
     const totalPages = book.metadata?.totalPages || null;
@@ -322,6 +331,12 @@ export default function BookDetail() {
       totalPages: totalPages,
       percentageRead: 100,
     });
+
+    const completedBook = { ...book, ...statusUpdate };
+    if (canRecommend(completedBook) && !book.recommendPrompted) {
+      await db.books.update(id, { recommendPrompted: true });
+      setShowRecommendPrompt(true);
+    }
 
     fullSync().catch(err => console.warn('[Sync] Immediate sync failed:', err));
   };
@@ -336,16 +351,19 @@ export default function BookDetail() {
       ? Math.min(100, Math.max(0, numericProgress))
       : `${newProgress}/${book.metadata?.totalPages}`;
 
-    await db.books.update(id, {
+    const statusUpdate = {
       progress: { 
         ...book.progress, 
         type: currentProgressType, 
         value: formattedVal 
       },
       status: 'reading',
+      ...recommendPatchForStatus('reading'),
       updatedAt: new Date().toISOString(),
       synced: 0
-    });
+    };
+    await db.books.update(id, statusUpdate);
+    await pushBook({ ...book, ...statusUpdate });
 
     // [Bug 13] Also write to ebookProgress table so it syncs to Supabase
     const totalPages = book.metadata?.totalPages || null;
@@ -393,6 +411,7 @@ export default function BookDetail() {
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-indigo/20 lg:pl-64 pb-28 lg:pb-12">
       {/* Sidebar/Bottom Navigation */}
       <Navigation />
+      {showRecommendPrompt && <RecommendPrompt book={{ ...book, status: 'completed', recommendPrompted: true }} onClose={() => setShowRecommendPrompt(false)} />}
 
       {/* Hero Cover Backdrop Section */}
       <div className="relative h-48 w-full overflow-hidden">
