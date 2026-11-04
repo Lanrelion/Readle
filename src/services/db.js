@@ -92,33 +92,29 @@ export async function deleteQuote(id) {
   await db.deletedRecords.put({ id, type: 'quote' });
 }
 
-// [Bug 7] Rewritten to PRESERVE fileBlobs during sign-out.
-// Instead of wiping everything, we keep skeleton records with just id + fileBlob.
-// When the user signs back in, syncCloudToLocal will restore metadata on top of the skeletons.
+// Preserve only local file/cover payloads while signed out. Cloud sync restores
+// the complete metadata before these placeholders are shown in the library.
 export async function clearLocalDatabase() {
-  // Preserve fileBlobs and covers: iterate all books, keep only essential local-only data.
-  // When the user signs back in, syncCloudToLocal will restore metadata on top of the skeletons.
-  const allBooks = await db.books.toArray();
-  for (const book of allBooks) {
-    if (book.fileBlob || book.cover) {
-      // Keep skeleton with local-only data intact — sync will restore metadata
-      const skeleton = {
+  await db.transaction('rw', db.books, db.quotes, db.ebookProgress, db.deletedRecords, async () => {
+    const allBooks = await db.books.toArray();
+    const skeletons = allBooks
+      .filter(book => book.fileBlob || book.cover)
+      .map(book => ({
         id: book.id,
         _skeletonOnly: true,
-        synced: 1, // So syncCloudToLocal will overwrite metadata
-      };
-      if (book.fileBlob) skeleton.fileBlob = book.fileBlob;
-      if (book.cover) skeleton.cover = book.cover;
-      await db.books.put(skeleton);
-    } else {
-      // No local-only data to preserve — safe to delete
-      await db.books.delete(book.id);
-    }
-  }
-  
-  await db.quotes.clear();
-  await db.ebookProgress.clear();
-  await db.deletedRecords.clear();
+        synced: 1,
+        ...(book.fileBlob ? { fileBlob: book.fileBlob } : {}),
+        ...(book.cover ? { cover: book.cover } : {}),
+      }));
+
+    // One transaction prevents an interrupted sign-out from leaving a mixture
+    // of full records and placeholders that the next cloud pull cannot merge.
+    await db.books.clear();
+    if (skeletons.length) await db.books.bulkPut(skeletons);
+    await db.quotes.clear();
+    await db.ebookProgress.clear();
+    await db.deletedRecords.clear();
+  });
 }
 
 // Helper to save progress for ANY book type (physical, ebook, pdf)

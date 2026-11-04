@@ -289,6 +289,7 @@ export async function syncCloudToLocal() {
       .eq('user_id', userId);
 
     if (booksError) throw booksError;
+    console.info(`[Sync] Cloud returned ${cloudBooks?.length || 0} books for the signed-in account`);
 
     // Delete local books that were deleted on other devices
     const cloudBookIds = new Set(cloudBooks?.map(b => b.id) || []);
@@ -312,8 +313,6 @@ export async function syncCloudToLocal() {
         if (deletedBookIds.has(book.id)) continue;
 
         const local = await db.books.get(book.id);
-        const cloudNewer = local ? (new Date(book.updated_at) > new Date(local.updatedAt || local.dateAdded || 0)) : true;
-        
         if (!local) {
           // [Bug 1] New book from cloud — use add() since there's no local record
           
@@ -351,7 +350,7 @@ export async function syncCloudToLocal() {
             fileBlob: downloadedBlob // Will be Blob or null
           });
           downloaded++;
-        } else if (local.synced === 1) {
+        } else if (local.synced === 1 || local._skeletonOnly) {
           // Check if we need to download the file (it exists in cloud but not locally)
           let downloadedBlob = local.fileBlob;
           if (book.file_url && !local.fileBlob) {
@@ -368,34 +367,42 @@ export async function syncCloudToLocal() {
             : null;
           const resolvedCover = downloadedCover || (cloudCoverIsStored ? local.cover : (book.cover || local.cover));
 
-          if (local._skeletonOnly || cloudNewer || downloadedBlob !== local.fileBlob || (downloadedCover && downloadedCover !== local.cover)) {
-            // [Bug 1] Existing book — use update() to only modify metadata fields.
-            // This preserves fileBlob and any other local-only fields automatically.
+          const cloudPatch = {
+            _skeletonOnly: false,
+            type: book.type,
+            title: book.title,
+            author: book.author,
+            isbn: book.isbn,
+            status: book.status,
+            // Only update cover from cloud if cloud has one, otherwise keep local
+            cover: resolvedCover,
+            coverSyncedAt: resolvedCover ? (local.coverSyncedAt || new Date().toISOString()) : null,
+            progress: book.progress,
+            dateAdded: book.date_added,
+            dateCompleted: book.date_completed,
+            file_url: book.file_url,
+            metadata: book.metadata,
+            notes: book.notes,
+            tags: book.tags || [],
+            recommended: !!book.recommended,
+            recommendedAt: book.recommended_at || null,
+            recommendedSyncedAt: book.recommended
+              ? (local.recommendedSyncedAt || new Date().toISOString())
+              : null,
+            updatedAt: book.updated_at,
+            synced: 1,
+          };
+          const metadataChanged = local._skeletonOnly || Object.entries(cloudPatch).some(
+            ([key, value]) => JSON.stringify(local[key] ?? null) !== JSON.stringify(value ?? null)
+          );
+
+          // Cloud rows are authoritative for synced records. Timestamps can be
+          // absent or stale on older rows, so they must not decide whether a
+          // hidden sign-out skeleton is restored. update() keeps local-only data.
+          if (metadataChanged || downloadedBlob !== local.fileBlob) {
             await db.books.update(book.id, {
-              _skeletonOnly: false,
-              type: book.type,
-              title: book.title,
-              author: book.author,
-              isbn: book.isbn,
-              status: book.status,
-              // Only update cover from cloud if cloud has one, otherwise keep local
-              cover: resolvedCover,
-              coverSyncedAt: resolvedCover ? (local.coverSyncedAt || new Date().toISOString()) : null,
-              progress: book.progress,
-              dateAdded: book.date_added,
-              dateCompleted: book.date_completed,
-              file_url: book.file_url,
-              metadata: book.metadata,
-              notes: book.notes,
-              tags: book.tags || [],
-              recommended: !!book.recommended,
-              recommendedAt: book.recommended_at || null,
-              recommendedSyncedAt: book.recommended
-                ? (local.recommendedSyncedAt || new Date().toISOString())
-                : null,
-              updatedAt: book.updated_at,
-              synced: 1,
-              fileBlob: downloadedBlob
+              ...cloudPatch,
+              ...(downloadedBlob !== local.fileBlob ? { fileBlob: downloadedBlob } : {}),
             });
             downloaded++;
           }
@@ -524,8 +531,9 @@ export async function syncCloudToLocal() {
       }
     }
 
-    console.log(`[Sync] Downloaded ${downloaded} items, ${failed} failed`);
-    return { downloaded, failed };
+    const visibleBookCount = await db.books.filter(local => !local._skeletonOnly).count();
+    console.log(`[Sync] Downloaded ${downloaded} items, ${failed} failed; ${visibleBookCount} visible local books`);
+    return { downloaded, failed, cloudBookCount: cloudBooks?.length || 0, visibleBookCount };
   } catch (error) {
     console.error('[Sync] Sync from cloud failed:', error);
     return { downloaded, failed };
