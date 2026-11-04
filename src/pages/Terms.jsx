@@ -40,7 +40,7 @@ export function Terms() {
           Removal requests
         </h2>
         <p className="text-sm text-foreground leading-relaxed">
-          If you believe something on Garder infringes your rights, email{' '}
+          If you believe something on garder. infringes your rights, email{' '}
           {email ? <a className="underline" href={`mailto:${email}`}>{email}</a> : 'us'}{' '}
           with the book title and a short description. We will review it and remove
           it where appropriate.
@@ -52,7 +52,7 @@ export function Terms() {
           Not legal advice
         </h2>
         <p className="text-sm text-foreground-tertiary leading-relaxed">
-          These terms are a plain-language starting point. Garder is a small
+          These terms are a plain-language starting point. garder. is a small
           independent project.
         </p>
       </section>

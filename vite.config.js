@@ -18,8 +18,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,mjs}']
       },
       manifest: {
-        name: 'Garder: Offline Reading & Book Tracking',
-        short_name: 'Garder',
+        name: 'garder.: Offline Reading & Book Tracking',
+        short_name: 'garder.',
         description: 'A quiet, offline-first PWA for reading EPUB/PDFs and tracking your physical book collection.',
         theme_color: '#F5F1E8',
         background_color: '#FFFFFF',

@@ -25,7 +25,7 @@ export default function Navigation() {
         <Link to="/" className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Books size={18} weight="light" className="text-indigo" aria-hidden="true" />
           <span className="font-serif text-xl font-normal tracking-tight text-foreground">
-            Garder
+            garder.
           </span>
         </Link>
       </div>
@@ -35,7 +35,7 @@ export default function Navigation() {
         <div className="mb-10 flex items-center justify-center">
           <Link to="/" className="hover:opacity-80 transition-opacity">
             <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
-              Garder
+              garder.
             </span>
           </Link>
         </div>

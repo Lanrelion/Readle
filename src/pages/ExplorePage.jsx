@@ -388,7 +388,7 @@ export function ExplorePage() {
             Recommended by readers
           </h1>
           <p className="text-sm text-foreground-secondary max-w-md">
-            Books Garder readers finished and want to pass on. No names, just titles.
+            Books garder. readers finished and want to pass on. No names, just titles.
           </p>
         </header>
 

@@ -537,7 +537,7 @@ export default function EbookReader() {
           {!logoError ? (
             <img
               src="/logo.svg"
-              alt="Garder"
+              alt="garder."
               className={`h-5 transition duration-300 select-none cursor-pointer ${effectiveDarkEpub ? 'invert brightness-200 contrast-125' : ''}`}
               onError={() => setLogoError(true)}
             />

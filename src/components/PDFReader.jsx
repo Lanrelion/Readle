@@ -208,7 +208,7 @@ export function PDFReader({ bookId, fileBlob, bookTitle, onProgressUpdate }) {
           {!logoError ? (
             <img
               src="/logo.svg"
-              alt="Garder"
+              alt="garder."
               className={`h-5 transition duration-300 select-none cursor-pointer ${isDark ? 'invert brightness-200 contrast-125' : ''}`}
               onError={() => setLogoError(true)}
             />
