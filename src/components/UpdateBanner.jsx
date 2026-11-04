@@ -19,9 +19,13 @@ export function UpdateBanner() {
   const refresh = async () => {
     if (applying) return
     setApplying(true)
+    const reloadFallback = window.setTimeout(() => {
+      window.location.reload()
+    }, 8000)
     try {
       await applyUpdate()
     } catch (error) {
+      window.clearTimeout(reloadFallback)
       console.warn('[PWA] Could not apply the available update:', error)
       setApplying(false)
     }
