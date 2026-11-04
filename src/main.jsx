@@ -31,12 +31,23 @@ import { registerSW } from 'virtual:pwa-register'
 if (!import.meta.env.DEV) {
   const updateSW = registerSW({
     onNeedRefresh() {
-      if (confirm('New content available. Reload?')) {
-        updateSW(true)
-      }
+      window.dispatchEvent(new CustomEvent('garder-update-ready', {
+        detail: { applyUpdate: () => updateSW(true) },
+      }))
     },
     onOfflineReady() {
       console.log('[App] App is ready to work offline.')
+    },
+    onRegisteredSW(_url, registration) {
+      if (!registration) return
+
+      const checkForUpdate = () => {
+        if (navigator.onLine) registration.update().catch(() => {})
+      }
+      window.setInterval(checkForUpdate, 60 * 60 * 1000)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkForUpdate()
+      })
     },
   })
 }

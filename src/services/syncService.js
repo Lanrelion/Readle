@@ -372,6 +372,7 @@ export async function syncCloudToLocal() {
             // [Bug 1] Existing book — use update() to only modify metadata fields.
             // This preserves fileBlob and any other local-only fields automatically.
             await db.books.update(book.id, {
+              _skeletonOnly: false,
               type: book.type,
               title: book.title,
               author: book.author,

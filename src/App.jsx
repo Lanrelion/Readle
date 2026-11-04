@@ -16,6 +16,7 @@ import { fullSync } from './services/syncService';
 import { clearLocalDatabase, removeSeedBooks } from './services/db';
 import { getProfile, updateLastSeen } from './services/profileService';
 import { repairMissingCovers } from './services/repairService';
+import { UpdateBanner } from './components/UpdateBanner';
 import './App.css';
 
 function App() {
@@ -169,6 +170,7 @@ function App() {
 
   return (
     <Router>
+      <UpdateBanner />
       <OfflineBanner />
       <AuthModal
         isOpen={showAuthModal}
