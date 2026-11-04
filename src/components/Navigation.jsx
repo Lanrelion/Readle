@@ -4,7 +4,6 @@ import gsap from 'gsap';
 
 export default function Navigation() {
   const location = useLocation();
-  const buildId = import.meta.env.VITE_BUILD_ID || 'local';
 
   const animateClick = (element) => {
     gsap.timeline()
@@ -28,9 +27,6 @@ export default function Navigation() {
             Garder
           </span>
         </Link>
-        <span className="mt-1 font-sans text-[9px] tracking-wide text-foreground-tertiary" title={`Build ${buildId}`}>
-          Build {buildId}
-        </span>
       </div>
 
       {/* Desktop Navigation Sidebar (>= 1024px) */}
@@ -64,9 +60,6 @@ export default function Navigation() {
             );
           })}
         </div>
-        <span className="pt-4 text-center font-sans text-[10px] tracking-wide text-foreground-tertiary" title={`Build ${buildId}`}>
-          Build {buildId}
-        </span>
       </nav>
 
       {/* Mobile Navigation Bottom Bar (< 1024px) */}

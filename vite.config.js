@@ -2,24 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
-import process from 'node:process'
-import { execFileSync } from 'node:child_process'
 import { VitePWA } from 'vite-plugin-pwa'
-
-const buildId = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
-  || (() => {
-    try {
-      return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], { encoding: 'utf8' }).trim()
-    } catch {
-      return 'local'
-    }
-  })()
 
 // https://vite.dev/config/
 export default defineConfig({
-  define: {
-    'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
-  },
   plugins: [
     react(),
     tailwindcss(),
