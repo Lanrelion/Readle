@@ -20,10 +20,11 @@ export default function Navigation() {
 
   return (
     <>
-      {/* Mobile Top Bar Logo (< 1024px) */}
-      <div className="lg:hidden flex flex-col items-center justify-center pt-6 pb-0">
-        <Link to="/" className="hover:opacity-80 transition-opacity flex items-center justify-center">
-          <span className="font-serif text-3xl font-normal tracking-tight text-foreground">
+      {/* Compact mobile wordmark */}
+      <div className="lg:hidden flex h-10 items-center px-5">
+        <Link to="/" className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Books size={18} weight="light" className="text-indigo" aria-hidden="true" />
+          <span className="font-serif text-xl font-normal tracking-tight text-foreground">
             Garder
           </span>
         </Link>
