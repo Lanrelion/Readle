@@ -44,6 +44,11 @@ function applyEpubThemeStyles(doc, isDark, fontMode) {
       -webkit-font-smoothing: antialiased;
       overflow-wrap: break-word !important;
     }
+    body, body * {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
     p, span, div, li, blockquote, dd, dt, article, section, em, strong, i, b {
       color: ${textColor} !important;
       background-color: transparent !important;
@@ -223,16 +228,37 @@ export default function EbookReader() {
       rendition.hooks.content.register((contents) => {
         const doc = contents.document;
         const win = contents.window;
+        let selectionTimer;
+        const captureSelection = () => {
+          const selection = win.getSelection();
+          if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+          const text = selection.toString().trim();
+          if (!text) return;
+
+          try {
+            const cfiRange = contents.cfiFromRange(selection.getRangeAt(0));
+            setPendingQuote({ text, cfiRange });
+          } catch (err) {
+            console.warn('Could not capture selected passage', err);
+          }
+        };
+        const scheduleSelectionCapture = () => {
+          window.clearTimeout(selectionTimer);
+          selectionTimer = window.setTimeout(captureSelection, 300);
+        };
+
+        doc.addEventListener('selectionchange', scheduleSelectionCapture);
 
         doc.addEventListener('touchend', () => {
           const selection = win.getSelection();
           if (selection && selection.rangeCount > 0 && selection.toString().trim().length > 0) {
-            const event = new MouseEvent('mouseup', {
+            const event = new win.MouseEvent('mouseup', {
               view: win,
               bubbles: true,
               cancelable: true
             });
             doc.dispatchEvent(event);
+            scheduleSelectionCapture();
           }
         });
 
@@ -247,8 +273,9 @@ export default function EbookReader() {
               try {
                 selection.modify("move", "backward", "sentence");
                 selection.modify("extend", "forward", "sentence");
-                const event = new MouseEvent('mouseup', { view: win, bubbles: true, cancelable: true });
+                const event = new win.MouseEvent('mouseup', { view: win, bubbles: true, cancelable: true });
                 doc.dispatchEvent(event);
+                scheduleSelectionCapture();
               } catch (err) {
                 console.warn("Sentence selection not supported", err);
               }
@@ -263,8 +290,9 @@ export default function EbookReader() {
             try {
               selection.modify("move", "backward", "sentence");
               selection.modify("extend", "forward", "sentence");
-              const event = new MouseEvent('mouseup', { view: win, bubbles: true, cancelable: true });
+              const event = new win.MouseEvent('mouseup', { view: win, bubbles: true, cancelable: true });
               doc.dispatchEvent(event);
+              scheduleSelectionCapture();
             } catch {
               // Ignore selection errors on unsupported elements
             }
@@ -371,6 +399,12 @@ export default function EbookReader() {
     };
 
     const handleTouchEnd = (e) => {
+      const hasTextSelection = renditionRef.current?.getContents().some((contents) => {
+        const selection = contents.window?.getSelection();
+        return selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+      });
+      if (hasTextSelection) return;
+
       const touchEndX = e.changedTouches[0].clientX;
       const diff = touchStartX - touchEndX;
       if (Math.abs(diff) > 50) { // Minimum swipe distance
@@ -402,6 +436,11 @@ export default function EbookReader() {
 
   const next = () => renditionRef.current?.next();
   const prev = () => renditionRef.current?.prev();
+  const clearTextSelection = () => {
+    renditionRef.current?.getContents().forEach((contents) => {
+      contents.window?.getSelection()?.removeAllRanges();
+    });
+  };
 
   const handleZoomIn = () => setFontZoom(prev => Math.min(200, prev + 10));
   const handleZoomOut = () => setFontZoom(prev => Math.max(50, prev - 10));
@@ -661,7 +700,10 @@ export default function EbookReader() {
               </div>
               <div className="flex gap-2 justify-end">
                 <button 
-                  onClick={() => setPendingQuote(null)}
+                  onClick={() => {
+                    setPendingQuote(null);
+                    clearTextSelection();
+                  }}
                   className="rounded-none px-4 py-2 text-xs font-sans font-medium text-foreground-tertiary hover:text-foreground"
                 >
                   Cancel
@@ -685,6 +727,7 @@ export default function EbookReader() {
                     }
                     
                     setPendingQuote(null);
+                    clearTextSelection();
                   }}
                   className="rounded-none bg-indigo px-5 py-2 text-xs font-sans font-medium text-white shadow-md transition hover:bg-clay"
                 >
