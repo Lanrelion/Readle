@@ -1,14 +1,14 @@
 // src/services/syncService.js
 import { supabase } from './supabase';
 import { db } from './db';
-import { uploadBookFile, downloadBookFile, deleteBookFile } from './storageService';
+import { uploadBookFile, downloadBookFile, uploadBookCover, downloadBookCover, deleteBookFile } from './storageService';
 
 // ── Sync Mutex ──────────────────────────────────────────────────────────────
 // Prevents concurrent fullSync() calls from racing against each other.
 let isSyncing = false;
 
 export function toCloudBook(book, userId) {
-  const cloudCover = (book.cover && book.cover.startsWith('data:')) ? null : (book.cover || null);
+  const cloudCover = book.cover?.startsWith('data:') ? null : (book.cover || null);
   const isRecommended = !!book.recommended
     && book.status === 'completed'
     && book.type !== 'pdf'
@@ -37,20 +37,53 @@ export function toCloudBook(book, userId) {
   };
 }
 
+async function prepareBookForCloud(book, userId) {
+  let fileUrl = book.file_url || null;
+  let fileSkipped = !!book.file_skipped;
+  if (book.fileBlob && !fileUrl && !fileSkipped) {
+    const uploadResult = await uploadBookFile(userId, book.id, book.fileBlob);
+    if (typeof uploadResult === 'string') fileUrl = uploadResult;
+    else if (uploadResult?.skipped) fileSkipped = true;
+    else throw new Error(`File upload failed for ${book.title}`);
+  }
+
+  let cover = book.cover || null;
+  let coverSynced = !!book.coverSyncedAt;
+  if (cover?.startsWith('data:') && !coverSynced) {
+    const uploadedCover = await uploadBookCover(userId, book.id, cover);
+    if (!uploadedCover) throw new Error(`Cover upload failed for ${book.title}`);
+    cover = uploadedCover;
+    coverSynced = true;
+  }
+
+  return {
+    cloudBook: { ...toCloudBook({ ...book, file_url: fileUrl }, userId), cover },
+    fileUrl,
+    fileSkipped,
+    coverSynced,
+  };
+}
+
 export async function pushBook(book) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return { ok: false, reason: 'signed_out' };
 
+    const prepared = await prepareBookForCloud(book, session.user.id);
     const { error } = await supabase
       .from('books')
-      .upsert(toCloudBook(book, session.user.id), { onConflict: 'id' });
+      .upsert(prepared.cloudBook, { onConflict: 'id' });
     if (error) throw error;
 
     const local = await db.books.get(book.id);
     if (local && (!book.updatedAt || local.updatedAt === book.updatedAt)) {
-      const fileSyncPending = !!local.fileBlob && !local.file_url && !local.file_skipped;
-      await db.books.update(book.id, { synced: fileSyncPending ? 0 : 1 });
+      const fileSyncPending = !!local.fileBlob && !prepared.fileUrl && !prepared.fileSkipped;
+      await db.books.update(book.id, {
+        synced: fileSyncPending ? 0 : 1,
+        file_url: prepared.fileUrl,
+        file_skipped: prepared.fileSkipped,
+        ...(prepared.coverSynced ? { coverSyncedAt: new Date().toISOString() } : {}),
+      });
     }
     return { ok: true };
   } catch (error) {
@@ -115,25 +148,20 @@ export async function syncLocalToCloud() {
 
   try {
     // Sync unsynced books (where synced is not 1, catching 0, undefined, or legacy records)
-    const localBooks = await db.books.filter(book => book.synced !== 1).toArray();
+    const localBooks = await db.books.filter(book => (
+      book.synced !== 1
+      || (book.fileBlob && !book.file_url && !book.file_skipped)
+      || (book.cover?.startsWith('data:') && !book.coverSyncedAt)
+    )).toArray();
     
     for (const book of localBooks) {
       try {
-        // Upload file to Supabase Storage if local fileBlob exists but no file_url is present
-        let fileUrl = book.file_url || null; // Might be undefined on older records
-        let fileSkipped = book.file_skipped || false;
-        if (book.fileBlob && !fileUrl && !fileSkipped) {
+        if (book.fileBlob && !book.file_url && !book.file_skipped) {
           console.log(`[Sync] Uploading file for book ${book.id}...`);
-          const uploadResult = await uploadBookFile(userId, book.id, book.fileBlob);
-          if (typeof uploadResult === 'string') {
-            fileUrl = uploadResult;
-          } else if (uploadResult?.skipped) {
-            console.log(`[Sync] Book ${book.id} file skipped (exceeds cloud limit), keeping local only`);
-            fileSkipped = true;
-          }
         }
-
-        const bookData = toCloudBook({ ...book, file_url: fileUrl }, userId);
+        const prepared = await prepareBookForCloud(book, userId);
+        const { fileUrl, fileSkipped } = prepared;
+        const bookData = prepared.cloudBook;
 
         const { error } = await supabase.from('books').upsert(bookData, { onConflict: 'id' });
         if (error) {
@@ -149,6 +177,7 @@ export async function syncLocalToCloud() {
         
         // Mark as synced locally and update file_url
         const syncedPatch = { synced: 1, file_url: fileUrl, file_skipped: fileSkipped };
+        if (prepared.coverSynced) syncedPatch.coverSyncedAt = new Date().toISOString();
         if (bookData.recommended) {
           syncedPatch.recommendedSyncedAt = new Date().toISOString();
         }
@@ -293,6 +322,9 @@ export async function syncCloudToLocal() {
             console.log(`[Sync] Downloading file for new book ${book.id}...`);
             downloadedBlob = await downloadBookFile(userId, book.id);
           }
+          const cover = book.cover?.startsWith('book-cover://')
+            ? await downloadBookCover(userId, book.id)
+            : book.cover;
 
           await db.books.add({
             id: book.id,
@@ -301,7 +333,8 @@ export async function syncCloudToLocal() {
             author: book.author,
             isbn: book.isbn,
             status: book.status,
-            cover: book.cover,
+            cover: cover || null,
+            coverSyncedAt: cover ? new Date().toISOString() : null,
             progress: book.progress,
             dateAdded: book.date_added,
             dateCompleted: book.date_completed,
@@ -329,7 +362,13 @@ export async function syncCloudToLocal() {
             }
           }
 
-          if (cloudNewer || downloadedBlob !== local.fileBlob) {
+          const cloudCoverIsStored = book.cover?.startsWith('book-cover://');
+          const downloadedCover = cloudCoverIsStored
+            ? await downloadBookCover(userId, book.id)
+            : null;
+          const resolvedCover = downloadedCover || (cloudCoverIsStored ? local.cover : (book.cover || local.cover));
+
+          if (cloudNewer || downloadedBlob !== local.fileBlob || (downloadedCover && downloadedCover !== local.cover)) {
             // [Bug 1] Existing book — use update() to only modify metadata fields.
             // This preserves fileBlob and any other local-only fields automatically.
             await db.books.update(book.id, {
@@ -339,7 +378,8 @@ export async function syncCloudToLocal() {
               isbn: book.isbn,
               status: book.status,
               // Only update cover from cloud if cloud has one, otherwise keep local
-              cover: book.cover || local.cover,
+              cover: resolvedCover,
+              coverSyncedAt: resolvedCover ? (local.coverSyncedAt || new Date().toISOString()) : null,
               progress: book.progress,
               dateAdded: book.date_added,
               dateCompleted: book.date_completed,

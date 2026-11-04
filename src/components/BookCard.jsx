@@ -73,7 +73,7 @@ export default function BookCard({ book }) {
     return daysSinceAdded >= 0 && daysSinceAdded <= 7;
   };
 
-  const hasCover = book.cover && book.cover !== 'null';
+  const hasCover = book.cover && book.cover !== 'null' && !book.cover.startsWith('book-cover://');
 
   return (
     <div 

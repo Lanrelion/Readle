@@ -419,8 +419,8 @@ export default function BookDetail() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: book.cover ? `url(${book.cover})` : 'none',
-            backgroundColor: !book.cover ? titleToColor(book.title) : undefined,
+            backgroundImage: book.cover && !book.cover.startsWith('book-cover://') ? `url(${book.cover})` : 'none',
+            backgroundColor: !book.cover || book.cover.startsWith('book-cover://') ? titleToColor(book.title) : undefined,
             filter: 'blur(20px)',
             transform: 'scale(1.1)',
           }}
@@ -440,7 +440,7 @@ export default function BookDetail() {
 
         {/* Floating cover — visible only on mobile (md:hidden); desktop uses sidebar */}
         <div className="md:hidden absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-20">
-          {book.cover && book.cover !== 'null' ? (
+          {book.cover && book.cover !== 'null' && !book.cover.startsWith('book-cover://') ? (
             <img
               src={book.cover}
               alt={book.title}
@@ -478,7 +478,7 @@ export default function BookDetail() {
               ref={bookCover}
               className="aspect-[3/4] w-full overflow-hidden rounded-none border border-foreground-tertiary/20 bg-background-secondary shadow-xl relative"
             >
-              {book.cover && book.cover !== 'null' && (
+              {book.cover && book.cover !== 'null' && !book.cover.startsWith('book-cover://') && (
                 <img 
                   src={book.cover} 
                   alt={`Cover of ${book.title}`}

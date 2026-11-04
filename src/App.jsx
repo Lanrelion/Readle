@@ -125,7 +125,8 @@ function App() {
     if (!user) return;
 
     // Initial sync (covers sign-in event too since user state changed)
-    fullSync().then(result => {
+    fullSync().then(async result => {
+      await repairMissingCovers();
       if (result.downloaded + result.uploaded > 0) {
         console.log('[App] Initial sync complete:', result);
       }

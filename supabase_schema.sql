@@ -210,6 +210,28 @@ UPDATE storage.buckets
 SET file_size_limit = 26214400   -- 25MB in bytes
 WHERE id = 'book_files';
 
+-- Keep ebook files and their cover images private to each signed-in user's folder.
+DROP POLICY IF EXISTS "book_files_select_own_folder" ON storage.objects;
+CREATE POLICY "book_files_select_own_folder" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'book_files' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "book_files_insert_own_folder" ON storage.objects;
+CREATE POLICY "book_files_insert_own_folder" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'book_files' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "book_files_update_own_folder" ON storage.objects;
+CREATE POLICY "book_files_update_own_folder" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'book_files' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'book_files' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "book_files_delete_own_folder" ON storage.objects;
+CREATE POLICY "book_files_delete_own_folder" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'book_files' AND (storage.foldername(name))[1] = auth.uid()::text);
+
 
 -- ==============================================================================
 -- Explore Books Public Aggregation View
@@ -257,7 +279,8 @@ CREATE OR REPLACE VIEW public.explore_books WITH (security_invoker = false) AS
 SELECT
   min(title) AS title,
   min(author) AS author,
-  max(nullif(nullif(btrim(cover), ''), 'null')) AS cover,
+  max(CASE WHEN cover NOT LIKE 'book-cover://%'
+    THEN nullif(nullif(btrim(cover), ''), 'null') END) AS cover,
   COALESCE(
     (
       SELECT array_agg(DISTINCT t)

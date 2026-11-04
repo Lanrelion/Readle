@@ -3,6 +3,42 @@ import { MAX_CLOUD_FILE_MB } from '../utils/fileLimits';
 
 const BUCKET_NAME = 'book_files';
 
+const coverPath = (userId, bookId) => `${userId}/${bookId}.cover`;
+
+export async function uploadBookCover(userId, bookId, dataUrl) {
+  if (!userId || !bookId || !dataUrl?.startsWith('data:')) return null;
+  try {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const path = coverPath(userId, bookId);
+    const { error } = await supabase.storage.from(BUCKET_NAME).upload(path, blob, {
+      cacheControl: '3600', upsert: true, contentType: blob.type || 'image/jpeg',
+    });
+    if (error) throw error;
+    return 'book-cover://stored';
+  } catch (error) {
+    console.error('[Storage] Failed to upload book cover:', error);
+    return null;
+  }
+}
+
+export async function downloadBookCover(userId, bookId) {
+  if (!userId || !bookId) return null;
+  try {
+    const { data, error } = await supabase.storage.from(BUCKET_NAME).download(coverPath(userId, bookId));
+    if (error) throw error;
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(data);
+    });
+  } catch (error) {
+    console.error('[Storage] Failed to download book cover:', error);
+    return null;
+  }
+}
+
 /**
  * Uploads a book file (Blob) to Supabase Storage.
  * Uses the path `${userId}/${bookId}`.
@@ -93,7 +129,7 @@ export async function deleteBookFile(userId, bookId) {
     
     const { error } = await supabase.storage
       .from(BUCKET_NAME)
-      .remove([filePath]);
+      .remove([filePath, coverPath(userId, bookId)]);
 
     if (error) {
       console.error('[Storage] Delete error:', error);
