@@ -274,7 +274,7 @@ export default function AddBook() {
       <Navigation />
 
       {/* Main Sandbox */}
-      <main ref={pageContainer} className="container mx-auto px-6 py-8 lg:px-12 max-w-2xl">
+      <main ref={pageContainer} className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:px-12 max-w-2xl w-full">
         
         {/* Literary Header */}
         <header className="flex flex-col gap-4 py-6 border-b border-foreground-tertiary/10 mb-8">

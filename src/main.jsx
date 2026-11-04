@@ -31,6 +31,7 @@ import { registerSW } from 'virtual:pwa-register'
 if (!import.meta.env.DEV) {
   const updateSW = registerSW({
     onNeedRefresh() {
+      window.__garderUpdateSW = () => updateSW(true)
       window.dispatchEvent(new CustomEvent('garder-update-ready', {
         detail: { applyUpdate: () => updateSW(true) },
       }))
@@ -50,5 +51,6 @@ if (!import.meta.env.DEV) {
       })
     },
   })
+  window.__garderUpdateSW = () => updateSW(true)
 }
 

@@ -381,10 +381,10 @@ export function ExplorePage() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-indigo/20 lg:pl-64 pb-28 lg:pb-12">
       <Navigation />
-      <main className="container mx-auto px-6 py-8 lg:px-12 max-w-4xl">
+      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:px-12 max-w-4xl w-full">
         {/* Header */}
-        <header className="flex flex-col gap-3 py-6 border-b border-foreground-tertiary/10 mb-8">
-          <h1 className="text-4xl lg:text-5xl font-serif font-normal text-foreground leading-tight">
+        <header className="flex flex-col gap-3 py-4 sm:py-6 border-b border-foreground-tertiary/10 mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-normal text-foreground leading-tight">
             Recommended by readers
           </h1>
           <p className="text-sm text-foreground-secondary max-w-md">
@@ -394,7 +394,7 @@ export function ExplorePage() {
 
         {/* Tag filter */}
         {allTags.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide">
             <button
               onClick={() => selectTag(null)}
               className={`
@@ -426,7 +426,7 @@ export function ExplorePage() {
         )}
 
         {/* The room: recessed wall with display ledge and bookshelves */}
-        <section ref={roomRef} className="shelf-room" data-focus={focus ? 'true' : 'false'}>
+        <section ref={roomRef} className="shelf-room -mx-4 sm:mx-0 w-[calc(100%+2rem)] sm:w-full" data-focus={focus ? 'true' : 'false'}>
           <ShelfAmbient moteCount={narrow ? 8 : 16} reduce={reduce} />
 
           <div ref={contentRef} className="shelf-content">

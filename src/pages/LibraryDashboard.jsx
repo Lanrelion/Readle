@@ -173,26 +173,26 @@ export default function LibraryDashboard({ user }) {
       />
 
       {/* Main Page Sandbox */}
-      <div ref={dashboardRef} className="container mx-auto px-6 py-8 lg:px-12 max-w-7xl">
+      <div ref={dashboardRef} className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:px-12 max-w-7xl w-full">
         
         {/* Page Hero Header */}
-        <header className="flex flex-col gap-4 py-6 border-b border-foreground-tertiary/10 mb-8">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-accent uppercase tracking-widest text-foreground-tertiary">
+        <header className="flex flex-col gap-3 sm:gap-4 py-4 sm:py-6 border-b border-foreground-tertiary/10 mb-6 sm:mb-8">
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-[11px] sm:text-xs font-accent uppercase tracking-widest text-foreground-tertiary">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <button
                 onClick={toggleTheme}
-                className="p-2 text-foreground-tertiary hover:text-foreground transition cursor-pointer"
+                className="p-1.5 sm:p-2 text-foreground-tertiary hover:text-foreground transition cursor-pointer"
                 aria-label="Toggle dark mode"
               >
-                {isDark ? <Sun size={20} weight="thin" /> : <Moon size={20} weight="thin" />}
+                {isDark ? <Sun size={18} weight="thin" /> : <Moon size={18} weight="thin" />}
               </button>
               {(!user && localStorage.getItem('skippedAuth') === 'true') ? null : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-4 py-2 bg-indigo hover:bg-clay text-background text-xs font-sans font-medium uppercase tracking-wider transition duration-300 rounded-none shadow-sm cursor-pointer"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo hover:bg-clay text-background text-[11px] sm:text-xs font-sans font-medium uppercase tracking-wider transition duration-300 rounded-none shadow-sm cursor-pointer whitespace-nowrap"
                 >
                   {user ? 'Account' : 'Sign In to Sync'}
                 </button>
@@ -200,27 +200,27 @@ export default function LibraryDashboard({ user }) {
             </div>
           </div>
           
-          <h1 className="text-5xl font-serif font-normal text-foreground leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-serif font-normal text-foreground leading-tight">
             Your Quiet Library
           </h1>
           
-          <p className="text-foreground-secondary font-sans text-base max-w-md">
+          <p className="text-foreground-secondary font-sans text-sm sm:text-base max-w-md">
             A visual, tactile collection of stories, thoughts, and reading journeys.
           </p>
         </header>
 
         {/* Tactical Statistics Section */}
-        <section className="grid grid-cols-3 gap-4 px-6 py-4 border-b border-foreground-tertiary/10 mb-10">
+        <section className="grid grid-cols-3 gap-2 sm:gap-4 px-2 sm:px-6 py-3 sm:py-4 border-b border-foreground-tertiary/10 mb-6 sm:mb-10">
           {[
             { value: stats.total, label: 'Volumes' },
             { value: stats.reading, label: 'Reading' },
             { value: stats.completed, label: 'Finished' },
           ].map(({ value, label }) => (
-            <div key={label} className="flex flex-col gap-1">
-              <span className="text-4xl font-serif font-normal text-foreground leading-none">
+            <div key={label} className="flex flex-col gap-0.5 sm:gap-1">
+              <span className="text-2xl sm:text-4xl font-serif font-normal text-foreground leading-none">
                 {value}
               </span>
-              <span className="text-[10px] font-accent text-foreground-tertiary tracking-widest uppercase">
+              <span className="text-[9px] sm:text-[10px] font-accent text-foreground-tertiary tracking-widest uppercase">
                 {label}
               </span>
             </div>
@@ -228,7 +228,7 @@ export default function LibraryDashboard({ user }) {
         </section>
 
         {/* Custom Search bar & Format Controls */}
-        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-6 sm:mb-10 flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between">
           {/* Muted Translucent Search Bar */}
           <div className="relative w-full max-w-md">
             <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-tertiary" size={18} weight="thin" />
@@ -237,19 +237,19 @@ export default function LibraryDashboard({ user }) {
               placeholder="Search your quiet collection…" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-none border border-foreground-tertiary/20 bg-background-secondary/50 backdrop-blur py-3 pl-12 pr-4 text-sm font-sans outline-none transition duration-200 placeholder:text-foreground-tertiary/60 focus:border-indigo focus:bg-background"
+              className="w-full rounded-none border border-foreground-tertiary/20 bg-background-secondary/50 backdrop-blur py-2.5 sm:py-3 pl-11 sm:pl-12 pr-4 text-sm font-sans outline-none transition duration-200 placeholder:text-foreground-tertiary/60 focus:border-indigo focus:bg-background"
             />
           </div>
 
           {/* Format & Date Filters */}
-          <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex flex-wrap gap-2.5 sm:gap-4 items-center max-w-full">
             {/* Format Selectors */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 overflow-x-auto max-w-full pb-1 scrollbar-hide">
               {['all', 'ebook', 'pdf', 'physical'].map((type) => (
                 <button
                   key={type}
                   onClick={() => setFilterType(type)}
-                  className={`h-9 px-5 text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 inline-flex items-center justify-center ${
+                  className={`h-8 sm:h-9 px-3 sm:px-5 text-[11px] sm:text-xs font-sans font-medium uppercase tracking-wider rounded-none border transition duration-300 inline-flex items-center justify-center shrink-0 whitespace-nowrap ${
                     filterType === type 
                       ? 'border-indigo bg-indigo text-white font-medium' 
                       : 'border-foreground-tertiary/20 bg-transparent text-foreground hover:bg-background-secondary hover:border-indigo'
@@ -270,7 +270,7 @@ export default function LibraryDashboard({ user }) {
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="h-9 pl-4 pr-10 py-0 text-xs font-sans font-medium uppercase tracking-wider bg-background-secondary border border-foreground-tertiary/20 rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer appearance-none"
+              className="h-8 sm:h-9 pl-3 sm:pl-4 pr-8 sm:pr-10 py-0 text-[11px] sm:text-xs font-sans font-medium uppercase tracking-wider bg-background-secondary border border-foreground-tertiary/20 rounded-none text-foreground outline-none transition duration-200 focus:border-indigo cursor-pointer appearance-none shrink-0"
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238c857b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
                 backgroundPosition: 'right 12px center',
@@ -358,7 +358,7 @@ export default function LibraryDashboard({ user }) {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3.5 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 w-full">
             {filteredBooks?.map(book => (
               <BookCard key={book.id} book={book} />
             ))}

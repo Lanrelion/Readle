@@ -7,7 +7,8 @@ export function UpdateBanner() {
 
   useEffect(() => {
     const handleUpdateReady = (event) => {
-      setApplyUpdate(() => event.detail?.applyUpdate || null)
+      const updateFn = event.detail?.applyUpdate || (typeof window !== 'undefined' && window.__garderUpdateSW) || null
+      setApplyUpdate(() => updateFn)
     }
 
     window.addEventListener('garder-update-ready', handleUpdateReady)

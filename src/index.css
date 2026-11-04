@@ -77,6 +77,11 @@
     border-color: var(--border);
   }
   
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
@@ -146,6 +151,7 @@
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
+  justify-content: center;
   column-gap: 3px;
   padding: 0 20px;
   min-height: calc(var(--pitch) * 3);
@@ -273,7 +279,18 @@
 .plaque { font-family: var(--font-accent); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--color-foreground-tertiary); }
 
 @media (max-width: 639px) {
-  .ledge-track { justify-content: flex-start; gap: 16px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
+  .ledge-track {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    min-width: 100%;
+    width: max-content;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
   .ledge-track::-webkit-scrollbar { display: none; }
   .ledge-track .faceout { scroll-snap-align: center; }
   .spine { min-width: 44px; }

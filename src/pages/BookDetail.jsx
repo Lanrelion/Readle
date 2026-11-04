@@ -469,7 +469,7 @@ export default function BookDetail() {
       </div>
 
       {/* Details Container */}
-      <main ref={detailContainer} className="container mx-auto px-6 md:-mt-0 mt-20 lg:px-12 max-w-5xl relative z-20 pt-4">
+      <main ref={detailContainer} className="container mx-auto px-4 sm:px-6 md:-mt-0 mt-20 lg:px-12 max-w-5xl w-full relative z-20 pt-4">
         <div className="flex flex-col md:flex-row gap-10 lg:gap-14">
           
           {/* Main Cover Sidebar Cover Image */}
