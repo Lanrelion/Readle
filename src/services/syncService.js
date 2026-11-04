@@ -368,7 +368,7 @@ export async function syncCloudToLocal() {
             : null;
           const resolvedCover = downloadedCover || (cloudCoverIsStored ? local.cover : (book.cover || local.cover));
 
-          if (cloudNewer || downloadedBlob !== local.fileBlob || (downloadedCover && downloadedCover !== local.cover)) {
+          if (local._skeletonOnly || cloudNewer || downloadedBlob !== local.fileBlob || (downloadedCover && downloadedCover !== local.cover)) {
             // [Bug 1] Existing book — use update() to only modify metadata fields.
             // This preserves fileBlob and any other local-only fields automatically.
             await db.books.update(book.id, {
