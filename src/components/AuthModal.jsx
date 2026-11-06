@@ -9,6 +9,7 @@ export function AuthModal({ isOpen, onClose }) {
   
   // Email/Password state
   const [isSignUp, setIsSignUp] = useState(false);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -40,8 +41,10 @@ export function AuthModal({ isOpen, onClose }) {
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setErrorMsg('Please enter both email and password.');
+    if ((isSignUp && !fullName.trim()) || !email.trim() || !password) {
+      setErrorMsg(isSignUp
+        ? 'Please enter your full name, email address, and password.'
+        : 'Please enter both email and password.');
       return;
     }
 
@@ -54,6 +57,9 @@ export function AuthModal({ isOpen, onClose }) {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: {
+            data: { full_name: fullName.trim() },
+          },
         });
         if (error) throw error;
         
@@ -218,6 +224,24 @@ export function AuthModal({ isOpen, onClose }) {
 
             {/* Email / Password Form */}
             <form onSubmit={handleEmailAuth} className="space-y-4 text-left">
+              {isSignUp && (
+                <div className="space-y-1">
+                  <label htmlFor="full-name-input" className="text-[10px] font-accent text-foreground-tertiary uppercase tracking-widest">
+                    Full Name
+                  </label>
+                  <input
+                    id="full-name-input"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    maxLength={120}
+                    placeholder="Your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full bg-background border border-foreground-tertiary/20 px-4 py-3 text-sm text-foreground outline-none focus:border-indigo rounded-none"
+                  />
+                </div>
+              )}
               <div className="space-y-1">
                 <label htmlFor="email-input" className="text-[10px] font-accent text-foreground-tertiary uppercase tracking-widest">
                   Email Address
@@ -293,7 +317,9 @@ export function AuthModal({ isOpen, onClose }) {
             </form>
 
             <p className="text-[10px] text-foreground-tertiary leading-relaxed max-w-xs mx-auto text-center">
-              We respect your privacy. We only access your email address to authenticate your sync bucket.
+              {isSignUp
+                ? 'Your full name is saved to your private account profile. Your email is used to authenticate your account.'
+                : 'We use your email address to authenticate your account.'}
             </p>
 
             <p className="text-xs text-foreground-tertiary text-center">
