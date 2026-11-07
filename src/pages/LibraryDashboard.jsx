@@ -173,7 +173,7 @@ export default function LibraryDashboard({ user }) {
       />
 
       {/* Main Page Sandbox */}
-      <div ref={dashboardRef} className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:px-12 max-w-7xl w-full">
+      <div ref={dashboardRef} className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:pt-0 lg:px-12 max-w-7xl w-full">
         
         {/* Page Hero Header */}
         <header className="flex flex-col gap-3 sm:gap-4 py-4 sm:py-6 border-b border-foreground-tertiary/10 mb-6 sm:mb-8">
@@ -194,7 +194,7 @@ export default function LibraryDashboard({ user }) {
                   onClick={() => setShowAuthModal(true)}
                   className="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo hover:bg-clay text-background text-[11px] sm:text-xs font-sans font-medium uppercase tracking-wider transition duration-300 rounded-none shadow-sm cursor-pointer whitespace-nowrap"
                 >
-                  {user ? 'Account' : 'Sign In to Sync'}
+                  {user ? 'Account' : 'Tap to Sync'}
                 </button>
               )}
             </div>
