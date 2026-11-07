@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { X, CloudArrowUp, SignOut, EnvelopeSimple, Lock } from '@phosphor-icons/react';
 
-export function AuthModal({ isOpen, onClose }) {
+export function AuthModal({ isOpen, onClose, user, authReady }) {
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState(null);
   
   // Email/Password state
   const [isSignUp, setIsSignUp] = useState(false);
@@ -20,17 +19,11 @@ export function AuthModal({ isOpen, onClose }) {
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
-    // Check current user session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-    });
-
     // Listen for auth state changes — only to auto-close modal on sign-in.
     // Uses onCloseRef to avoid the dependency churn that caused Bug 11.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setUser(session?.user || null);
-        if (event === 'SIGNED_IN') {
+        if (event === 'SIGNED_IN' && session) {
           onCloseRef.current?.();
         }
       }
@@ -64,7 +57,6 @@ export function AuthModal({ isOpen, onClose }) {
         if (error) throw error;
         
         if (data.session) {
-          setUser(data.session.user);
           localStorage.removeItem('skippedAuth');
           setSuccessMsg('Account created and signed in successfully!');
           setTimeout(() => onClose?.(), 1500);
@@ -79,7 +71,6 @@ export function AuthModal({ isOpen, onClose }) {
         if (error) throw error;
         
         if (data.session) {
-          setUser(data.session.user);
           localStorage.removeItem('skippedAuth');
           setSuccessMsg('Signed in successfully!');
           setTimeout(() => onClose?.(), 1500);
@@ -155,7 +146,12 @@ export function AuthModal({ isOpen, onClose }) {
           <X size={16} weight="thin" />
         </button>
 
-        {user ? (
+        {!authReady ? (
+          <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center" role="status" aria-live="polite">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-indigo border-r-transparent" />
+            <p className="text-sm text-foreground-secondary">Checking your sync account…</p>
+          </div>
+        ) : user ? (
           // Signed in state
           <div className="space-y-6 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-moss/10 text-moss">

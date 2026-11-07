@@ -8,7 +8,7 @@ import Navigation from '../components/Navigation';
 import gsap from 'gsap';
 import { AuthModal } from '../components/AuthModal';
 
-export default function LibraryDashboard({ user }) {
+export default function LibraryDashboard({ user, authReady }) {
   const { isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState(() => localStorage.getItem('statusFilter') || 'all');
@@ -170,6 +170,8 @@ export default function LibraryDashboard({ user }) {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+        user={user}
+        authReady={authReady}
       />
 
       {/* Main Page Sandbox */}

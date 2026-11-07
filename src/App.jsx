@@ -29,6 +29,7 @@ function App() {
       return cached ? JSON.parse(cached) : null;
     } catch { return null; }
   });
+  const [authReady, setAuthReady] = useState(false);
   const [isPurging, setIsPurging] = useState(() => localStorage.getItem('needsDBClear') === 'true');
 
   useEffect(() => {
@@ -60,14 +61,21 @@ function App() {
   useEffect(() => {
     if (isPurging) return;
     let timer = null;
+    let authEventSeen = false;
+    let latestAuthUser = null;
 
     // Check if user is signed in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const sessionUser = session?.user || null;
-      setUser(sessionUser);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) throw error;
+      const sessionUser = authEventSeen ? latestAuthUser : (session?.user || null);
+      if (!authEventSeen) setUser(sessionUser);
+      setAuthReady(true);
       // [Bug 10] Cache user in localStorage so next page load doesn't flash
       if (sessionUser) {
         localStorage.setItem('cachedUser', JSON.stringify({ id: sessionUser.id, email: sessionUser.email }));
+        if (timer) clearTimeout(timer);
+        timer = null;
+        setShowAuthModal(false);
       } else {
         localStorage.removeItem('cachedUser');
       }
@@ -78,17 +86,26 @@ function App() {
       if (!session && !skipped) {
         timer = setTimeout(() => setShowAuthModal(true), 5000);
       }
+    }).catch((error) => {
+      console.warn('[App] Could not check the current session:', error);
+      setAuthReady(true);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        authEventSeen = true;
         const sessionUser = session?.user || null;
+        latestAuthUser = sessionUser;
         setUser(sessionUser);
+        setAuthReady(true);
         
         // [Bug 10] Update cache on auth changes
         if (sessionUser) {
           localStorage.setItem('cachedUser', JSON.stringify({ id: sessionUser.id, email: sessionUser.email }));
+          if (timer) clearTimeout(timer);
+          timer = null;
+          setShowAuthModal(false);
         } else {
           localStorage.removeItem('cachedUser');
         }
@@ -175,10 +192,12 @@ function App() {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+        user={user}
+        authReady={authReady}
       />
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<LibraryDashboard user={user} />} />
+        <Route path="/" element={<LibraryDashboard user={user} authReady={authReady} />} />
         <Route path="/add" element={<AddBook />} />
         <Route path="/book/:id" element={<BookDetail />} />
         <Route path="/read/:id" element={<EbookReader />} />
