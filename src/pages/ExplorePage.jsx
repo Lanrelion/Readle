@@ -2,8 +2,6 @@
 import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { supabase } from '../services/supabase';
-import { db } from '../services/db';
-import { syncLocalToCloud } from '../services/syncService';
 import Navigation from '../components/Navigation';
 import { Spine } from '../components/explore/Spine';
 import { FaceOut } from '../components/explore/FaceOut';
@@ -46,7 +44,6 @@ export function ExplorePage() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTag, setActiveTag] = useState(null);
-  const [saved, setSaved] = useState(new Set());
   const [open, setOpen] = useState(null); // { book, rect }
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
@@ -112,13 +109,6 @@ export function ExplorePage() {
       window.removeEventListener('offline', handleOffline);
     };
   }, [loadExploreBooks]);
-
-  useEffect(() => {
-    db.books.toArray().then((localBooks) => {
-      const keys = new Set(localBooks.map((b) => `${norm(b.title)}|${norm(b.author)}`));
-      setSaved(keys);
-    }).catch(err => console.warn('[Explore] Failed to load local books:', err));
-  }, []);
 
   const openBook = useCallback((book, rect) => {
     setOpen({ book, rect });
@@ -205,48 +195,6 @@ export function ExplorePage() {
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [mode]);
-
-  const handleAddToLibrary = async (book) => {
-    try {
-      // Duplicate check by normalised title + author
-      const bookKey = `${norm(book.title)}|${norm(book.author)}`;
-      const existing = await db.books
-        .filter((b) => `${norm(b.title)}|${norm(b.author)}` === bookKey)
-        .first();
-
-      if (!existing) {
-        const newBook = {
-          id: crypto.randomUUID(),
-          type: 'physical',
-          title: book.title,
-          author: book.author,
-          cover: book.cover && book.cover !== 'null' ? book.cover : null,
-          tags: book.tags || [],
-          status: 'wantToRead',
-          recommended: false,
-          recommendedAt: null,
-          recommendedSyncedAt: null,
-          recommendPrompted: false,
-          progress: null,
-          dateAdded: new Date().toISOString(),
-          dateCompleted: null,
-          synced: 0,
-        };
-        await db.books.add(newBook);
-
-        // Sync if signed in
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          syncLocalToCloud().catch((err) => console.warn('[Explore] Sync failed:', err));
-        }
-      }
-
-      // Update saved set so spine dot appears immediately
-      setSaved((prev) => new Set(prev).add(bookKey));
-    } catch (err) {
-      console.error('[Explore] Failed to add book:', err);
-    }
-  };
 
   const { itemsByKey, visible, featured, rest, shelves, ledgeLabel } = useMemo(() => {
     const all = books.map((book) => ({
@@ -370,7 +318,6 @@ export function ExplorePage() {
 
   const spineProps = (book) => ({
     book,
-    saved: saved.has(book.key),
     isFocused: focus?.book.key === book.key,
     onEnter: handleEnter,
     onLeave: handleLeave,
@@ -388,7 +335,7 @@ export function ExplorePage() {
             Recommended by readers
           </h1>
           <p className="text-sm text-foreground-secondary max-w-md">
-            Books garder. readers finished and want to pass on. No names, just titles.
+            Books Garder readers finished, rated four or five stars, and recommend. No names, just titles.
           </p>
         </header>
 
@@ -469,7 +416,7 @@ export function ExplorePage() {
             {!loading && isOnline && visible.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none">
                 <p className="font-serif text-lg text-foreground-secondary">No recommendations yet.</p>
-                <p className="mt-2 text-sm text-foreground-secondary">Finish a book and recommend it. It will appear here.</p>
+                <p className="mt-2 text-sm text-foreground-secondary">Finish a book, rate it, and recommend it. It will appear here.</p>
                 <Link to="/" className="pointer-events-auto mt-4 inline-flex border border-foreground-tertiary/30 px-4 py-2 text-sm text-foreground hover:bg-background-secondary">
                   Go to your library
                 </Link>
@@ -491,8 +438,6 @@ export function ExplorePage() {
         <BookSheet
           book={open.book}
           originRect={open.rect}
-          saved={saved.has(open.book.key)}
-          onSave={handleAddToLibrary}
           onClose={() => setOpen(null)}
         />
       )}

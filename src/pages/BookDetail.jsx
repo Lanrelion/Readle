@@ -10,9 +10,9 @@ import { useTheme } from '../hooks/useTheme';
 import { getQuoteTheme } from '../utils/quoteColors';
 import { TagInput } from '../components/TagInput';
 import { titleToColor } from '../utils/colorUtils';
-import { canRecommend, recommendPatchForStatus } from '../utils/recommend';
-import RecommendPrompt from '../components/RecommendPrompt';
-import RecommendSection from '../components/RecommendSection';
+import { recommendPatchForStatus } from '../utils/recommend';
+import { RecommendPrompt } from '../components/RecommendPrompt';
+import { RatingAndRecommend } from '../components/RatingAndRecommend';
 import gsap from 'gsap';
 
 // Helper
@@ -158,7 +158,7 @@ function NotesTab({ book, onDelete }) {
         <TagInput tags={tags} onChange={setTags} />
       </div>
 
-      <RecommendSection book={book} />
+      {book.status === 'completed' && <RatingAndRecommend book={book} />}
 
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-accent text-foreground-tertiary tracking-widest uppercase">
@@ -332,8 +332,7 @@ export default function BookDetail() {
       percentageRead: 100,
     });
 
-    const completedBook = { ...book, ...statusUpdate };
-    if (canRecommend(completedBook) && !book.recommendPrompted) {
+    if (book.type !== 'pdf' && !book.recommendPrompted) {
       await db.books.update(id, { recommendPrompted: true });
       setShowRecommendPrompt(true);
     }

@@ -12,6 +12,7 @@ create table books (
   status text not null check (status in ('wantToRead', 'reading', 'completed')),
   cover text, -- Base64 or URL
   progress jsonb, -- {type: 'pages', value: '45/300'}
+  rating smallint CHECK (rating IS NULL OR rating BETWEEN 1 AND 5),
   recommended boolean NOT NULL DEFAULT false,
   recommended_at timestamptz,
   date_added timestamptz default now(),
@@ -246,6 +247,20 @@ ALTER TABLE public.books
   ADD COLUMN IF NOT EXISTS recommended boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS recommended_at timestamptz;
 
+ALTER TABLE public.books
+  ADD COLUMN IF NOT EXISTS rating smallint;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.books'::regclass AND conname = 'books_rating_range'
+  ) THEN
+    ALTER TABLE public.books
+      ADD CONSTRAINT books_rating_range CHECK (rating IS NULL OR rating BETWEEN 1 AND 5);
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.explore_blocklist (
   book_key text PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -295,6 +310,7 @@ FROM public.books
 WHERE type IN ('ebook', 'physical')
   AND status = 'completed'
   AND recommended = true
+  AND rating >= 4
   AND nullif(btrim(title), '') IS NOT NULL
   AND nullif(btrim(author), '') IS NOT NULL
   AND NOT EXISTS (

@@ -1,7 +1,7 @@
 import { useRef, useLayoutEffect } from 'react';
 import { gsap, prefersReducedMotion } from '../../utils/gsapSetup';
 import { CoverFace } from './CoverFace';
-import { RecSeal } from './RecSeal';
+import { StarBadge } from './StarBadge';
 import { CARD_H, CARD_W, HOVER_IN_MS, HOVER_OUT_MS, USE_3D_TURN } from './focusConfig';
 
 export function FaceOut({ book, index = 0, onOpen, innerRef, reduce = false }) {
@@ -75,7 +75,7 @@ export function FaceOut({ book, index = 0, onOpen, innerRef, reduce = false }) {
       onClick={(e) => onOpen?.(book, e.currentTarget.getBoundingClientRect())}
     >
       <CoverFace book={book} />
-      <RecSeal count={Number(book.recommendation_count) || 0} variant="cover" />
+      <StarBadge count={Number(book.recommendation_count) || 0} variant="cover" />
     </button>
   );
 }

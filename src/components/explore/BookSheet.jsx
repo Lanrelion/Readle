@@ -2,8 +2,9 @@
 import { useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { gsap, prefersReducedMotion } from '../../utils/gsapSetup';
 import { CoverFace } from './CoverFace';
+import { StarBadge } from './StarBadge';
 
-export function BookSheet({ book, originRect, saved, onSave, onClose }) {
+export function BookSheet({ book, originRect, onClose }) {
   const root = useRef(null);
   const backdrop = useRef(null);
   const cover = useRef(null);
@@ -220,15 +221,6 @@ export function BookSheet({ book, originRect, saved, onSave, onClose }) {
               {book.author}
             </p>
 
-            {(book.recommendation_count > 0) && (
-              <p
-                className="sheet-line"
-                style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--foreground-tertiary)', margin: 0 }}
-              >
-                Recommended by {book.recommendation_count} {book.recommendation_count === 1 ? 'reader' : 'readers'}
-              </p>
-            )}
-
             {(book.tags || []).length > 0 && (
               <div
                 className="sheet-line"
@@ -252,70 +244,15 @@ export function BookSheet({ book, originRect, saved, onSave, onClose }) {
                 ))}
               </div>
             )}
+            <p
+              className="sheet-line"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--foreground-tertiary)', margin: 0 }}
+            >
+              Recommended by {book.recommendation_count} {book.recommendation_count === 1 ? 'reader' : 'readers'}
+              <StarBadge count={Number(book.recommendation_count) || 0} variant="inline" />
+            </p>
           </div>
         </div>
-
-        {/* Action row */}
-        <div
-          className="sheet-line"
-          style={{
-            padding: '0 24px 20px',
-            display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-          }}
-        >
-          {saved ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontFamily: 'var(--font-sans)',
-                fontSize: 13,
-                color: 'var(--color-moss)',
-              }}
-            >
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-moss)', display: 'inline-block' }} />
-              On your list
-            </span>
-          ) : (
-            <button
-              onClick={() => onSave?.(book)}
-              style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: 13,
-                background: 'var(--color-moss)',
-                color: '#F5F1E8',
-                border: 'none',
-                padding: '10px 20px',
-                cursor: 'pointer',
-                letterSpacing: '.04em',
-              }}
-            >
-              Want to read
-            </button>
-          )}
-        </div>
-
-        {/* Note */}
-        {book.description && (
-          <p
-            className="sheet-line"
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: 15,
-              lineHeight: 1.65,
-              color: 'var(--foreground-secondary)',
-              padding: '0 24px 28px',
-              margin: 0,
-              borderTop: '1px solid var(--border)',
-              paddingTop: 16,
-            }}
-          >
-            {book.description}
-          </p>
-        )}
       </div>
     </div>
   );

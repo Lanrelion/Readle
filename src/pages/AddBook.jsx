@@ -225,6 +225,7 @@ export default function AddBook() {
         type: formData.type,
         status: formData.status,
         ...recommendPatchForStatus(formData.status),
+        rating: null,
         recommended: false,
         recommendedAt: null,
         recommendedSyncedAt: null,

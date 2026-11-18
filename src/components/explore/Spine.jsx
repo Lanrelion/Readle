@@ -1,7 +1,7 @@
 import { memo, useRef } from 'react';
-import { RecSeal } from './RecSeal';
+import { StarBadge } from './StarBadge';
 
-export const Spine = memo(function Spine({ book, saved, isFocused, onEnter, onLeave, onKeyFocus, onActivate }) {
+export const Spine = memo(function Spine({ book, isFocused, onEnter, onLeave, onKeyFocus, onActivate }) {
   const slotRef = useRef(null);
   const { art } = book;
   const count = Number(book.recommendation_count) || 0;
@@ -35,7 +35,7 @@ export const Spine = memo(function Spine({ book, saved, isFocused, onEnter, onLe
       onClick={() => onActivate(book, slotRef.current)}
     >
       <span className={`spine-wrap${art.leans ? ' leans' : ''}`}>
-        <RecSeal count={count} />
+        <StarBadge count={count} />
         <span
           className="spine"
           style={{ width: art.width, height: `calc(var(--s) * ${art.height}px)`, background: art.color, color: art.ink }}
@@ -46,7 +46,6 @@ export const Spine = memo(function Spine({ book, saved, isFocused, onEnter, onLe
           <span className="spine-title" aria-hidden="true">{book.title}</span>
           {art.width >= 46 && <span className="spine-author" aria-hidden="true">{book.author}</span>}
         </span>
-        {saved && <i className="saved-dot" aria-hidden="true" />}
       </span>
     </button>
   );

@@ -11,6 +11,7 @@ export function toCloudBook(book, userId) {
   const cloudCover = book.cover?.startsWith('data:') ? null : (book.cover || null);
   const isRecommended = !!book.recommended
     && book.status === 'completed'
+    && (book.rating ?? 0) >= 4
     && book.type !== 'pdf'
     && !!book.title?.trim()
     && !!book.author?.trim();
@@ -25,6 +26,7 @@ export function toCloudBook(book, userId) {
     status: book.status,
     cover: cloudCover,
     progress: book.progress || null,
+    rating: book.rating ?? null,
     date_added: book.dateAdded,
     date_completed: book.dateCompleted || null,
     file_url: book.file_url || null,
@@ -335,6 +337,7 @@ export async function syncCloudToLocal() {
             cover: cover || null,
             coverSyncedAt: cover ? new Date().toISOString() : null,
             progress: book.progress,
+            rating: book.rating ?? null,
             dateAdded: book.date_added,
             dateCompleted: book.date_completed,
             file_url: book.file_url,
@@ -378,6 +381,7 @@ export async function syncCloudToLocal() {
             cover: resolvedCover,
             coverSyncedAt: resolvedCover ? (local.coverSyncedAt || new Date().toISOString()) : null,
             progress: book.progress,
+            rating: book.rating ?? null,
             dateAdded: book.date_added,
             dateCompleted: book.date_completed,
             file_url: book.file_url,
